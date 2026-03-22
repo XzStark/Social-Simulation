@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import random
 
-from pepole.config import Scenario
-from pepole.engine import build_initial_state
-from pepole.finance_ledger import apply_tick_finance_ledger, effective_operating_cost_million_per_tick
+from people.config import Scenario
+from people.engine import build_initial_state
+from people.finance_ledger import apply_tick_finance_ledger, effective_operating_cost_million_per_tick
 
 
 def _product_finance_scenario(**of_kw) -> Scenario:

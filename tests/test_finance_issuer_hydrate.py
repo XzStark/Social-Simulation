@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import random
 
-from pepole.config import OperationalFinance, Scenario
-from pepole.engine import _hydrate_finance, build_initial_state
+from people.config import OperationalFinance, Scenario
+from people.engine import _hydrate_finance, build_initial_state
 
 
 def test_hydrate_scales_default_cash_debt_for_startup() -> None:

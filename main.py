@@ -13,12 +13,12 @@ if str(ROOT) not in sys.path:
 from rich.console import Console
 from rich.table import Table
 
-from pepole.config import Scenario
-from pepole.engine import RunConfig, run_ensemble_parallel, run_single_simulation, summarize_ensemble
-from pepole.state import WorldState
-from pepole.validation_tools import compare_tick_series, load_metrics_history_from_json, read_metrics_csv
-from pepole.providers.registry import get_client
-from pepole.roster import count_llm_agents_upper_bound
+from people.config import Scenario
+from people.engine import RunConfig, run_ensemble_parallel, run_single_simulation, summarize_ensemble
+from people.state import WorldState
+from people.validation_tools import compare_tick_series, load_metrics_history_from_json, read_metrics_csv
+from people.providers.registry import get_client
+from people.roster import count_llm_agents_upper_bound
 
 
 def scenario_from_args(args: argparse.Namespace) -> Scenario:
@@ -63,8 +63,8 @@ def _print_scenario_header(con: Console, scenario: Scenario) -> None:
 
 
 def _resolve_specs(args: argparse.Namespace) -> tuple[str, str]:
-    primary = args.primary or os.environ.get("PEPOLE_MODEL_PRIMARY") or "openai:gpt-4o"
-    fast = args.fast or os.environ.get("PEPOLE_MODEL_FAST") or "openai:gpt-4o-mini"
+    primary = args.primary or os.environ.get("PEOPLE_MODEL_PRIMARY") or "openai:gpt-4o"
+    fast = args.fast or os.environ.get("PEOPLE_MODEL_FAST") or "openai:gpt-4o-mini"
     return primary, fast
 
 
@@ -135,13 +135,13 @@ def cmd_run(args: argparse.Namespace) -> None:
         con.print(f"[bold]已写入 metrics_history[/bold] {dump_m}")
     dump_full = getattr(args, "dump_full_state", None)
     if dump_full:
-        from pepole.attribution_report import build_plain_report
-        from pepole.causal_consistency import audit_scenario_causal_consistency
-        from pepole.decision_support import build_decision_support_bundle
-        from pepole.experiment_manifest import build_experiment_manifest
+        from people.attribution_report import build_plain_report
+        from people.causal_consistency import audit_scenario_causal_consistency
+        from people.decision_support import build_decision_support_bundle
+        from people.experiment_manifest import build_experiment_manifest
 
         payload = {
-            "format": "pepole_run_dump_v1",
+            "format": "people_run_dump_v1",
             "seed": int(args.seed),
             "scenario_dict": scenario.model_dump(),
             "state_dict": state.model_dump(),
@@ -171,7 +171,7 @@ def cmd_ensemble(args: argparse.Namespace) -> None:
     _print_scenario_header(con, scenario)
     primary_spec, fast_spec = _resolve_specs(args)
     if scenario.regional_grounding.enabled:
-        from pepole.regional_grounding import prebake_regional_grounding_for_ensemble
+        from people.regional_grounding import prebake_regional_grounding_for_ensemble
 
         cfg0 = RunConfig(
             primary_client=get_client(primary_spec, allow_dry=True),
@@ -212,8 +212,8 @@ def cmd_ensemble(args: argparse.Namespace) -> None:
         con.print("[bold]标准决策简报（风险分布 / 尾部 / 分歧 / 建议）[/bold]")
         con.print(json.dumps(briefing, ensure_ascii=False, indent=2))
     if args.dump_json:
-        from pepole.causal_consistency import audit_scenario_causal_consistency
-        from pepole.experiment_manifest import build_experiment_manifest, scenario_content_hash
+        from people.causal_consistency import audit_scenario_causal_consistency
+        from people.experiment_manifest import build_experiment_manifest, scenario_content_hash
 
         dump = {
             "summary": summary,
@@ -286,7 +286,7 @@ def cmd_stability(args: argparse.Namespace) -> None:
 
 
 def cmd_calibrate(args: argparse.Namespace) -> None:
-    from pepole.calibration_loop import load_truth_rows, merge_realism_into_scenario_yaml, run_calibration
+    from people.calibration_loop import load_truth_rows, merge_realism_into_scenario_yaml, run_calibration
 
     con = Console()
     scenario = scenario_from_args(args)
@@ -331,7 +331,7 @@ def cmd_calibrate(args: argparse.Namespace) -> None:
 
 
 def cmd_sensitivity(args: argparse.Namespace) -> None:
-    from pepole.calibration_loop import load_truth_rows, run_sensitivity_realism
+    from people.calibration_loop import load_truth_rows, run_sensitivity_realism
 
     con = Console()
     scenario = scenario_from_args(args)
@@ -358,8 +358,8 @@ def cmd_sensitivity(args: argparse.Namespace) -> None:
 
 
 def cmd_scenario_audit(args: argparse.Namespace) -> None:
-    from pepole.causal_consistency import audit_scenario_causal_consistency
-    from pepole.experiment_manifest import scenario_content_hash
+    from people.causal_consistency import audit_scenario_causal_consistency
+    from people.experiment_manifest import scenario_content_hash
 
     con = Console()
     scenario = Scenario.load(args.scenario)
@@ -372,13 +372,13 @@ def cmd_scenario_audit(args: argparse.Namespace) -> None:
 
 
 def cmd_explain(args: argparse.Namespace) -> None:
-    from pepole.attribution_report import build_plain_report, explain_metric_at_tick
-    from pepole.config import Scenario
-    from pepole.decision_support import build_decision_support_bundle
+    from people.attribution_report import build_plain_report, explain_metric_at_tick
+    from people.config import Scenario
+    from people.decision_support import build_decision_support_bundle
 
     con = Console()
     raw = json.loads(Path(args.from_json).read_text(encoding="utf-8"))
-    if raw.get("format") != "pepole_run_dump_v1" and "state_dict" not in raw:
+    if raw.get("format") != "people_run_dump_v1" and "state_dict" not in raw:
         con.print("[red]JSON 需含 state_dict，或由 run --dump-full-state 生成。[/red]")
         raise SystemExit(2)
     state = WorldState.model_validate(raw["state_dict"])
@@ -435,7 +435,7 @@ def add_regional_grounding_args(parser: argparse.ArgumentParser) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="pepole — 政策制定者 / 产品发行方 社会与市场反响演练（多模型 MVP）",
+        description="people — 政策制定者 / 产品发行方 社会与市场反响演练（多模型 MVP）",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 

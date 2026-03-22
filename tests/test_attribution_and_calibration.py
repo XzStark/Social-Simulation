@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pepole.attribution_report import build_plain_report, explain_metric_at_tick
-from pepole.attribution import record_attribution
-from pepole.state import WorldState
-from pepole.validation_tools import average_mae, compare_tick_series
+from people.attribution_report import build_plain_report, explain_metric_at_tick
+from people.attribution import record_attribution
+from people.state import WorldState
+from people.validation_tools import average_mae, compare_tick_series
 
 
 def test_average_mae() -> None:

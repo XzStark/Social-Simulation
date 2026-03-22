@@ -7,8 +7,8 @@ REM 官方默认地址，一般无需改：
 set OPENAI_BASE_URL=https://api.openai.com/v1
 
 REM 强模型 / 快模型（可按账户可用模型名调整）
-set PEPOLE_MODEL_PRIMARY=openai:gpt-4o
-set PEPOLE_MODEL_FAST=openai:gpt-4o-mini
+set PEOPLE_MODEL_PRIMARY=openai:gpt-4o
+set PEOPLE_MODEL_FAST=openai:gpt-4o-mini
 
 echo 环境已设置。示例：
 echo   python main.py run --scenario scenarios\default.yaml

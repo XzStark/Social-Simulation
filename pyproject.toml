@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pepole"
+name = "people"
 version = "0.1.0"
 description = "政策与产品发行动作的社会 / 市场反响演练（LLM 沙盘）"
 readme = "README.md"
@@ -39,4 +39,4 @@ Repository = "https://github.com/XzStark/Social-Simulation"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["pepole*"]
+include = ["people*"]

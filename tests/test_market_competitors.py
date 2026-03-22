@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pepole.config import MarketCompetitorSpec, Scenario
-from pepole.context import build_decision_context
+from people.config import MarketCompetitorSpec, Scenario
+from people.context import build_decision_context
 
 
 def test_market_competitors_in_decision_context_for_product() -> None:

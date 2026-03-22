@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你对 pepole 的兴趣。
+感谢你对 people 的兴趣。
 
 **环境**：Python **3.10+**。本地可执行 `pip install -e ".[dev]"` 安装可编辑包与测试依赖（依赖声明见 `pyproject.toml` / `requirements.txt`）。
 

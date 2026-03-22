@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from pepole.attribution import MACRO_ATTR_KEYS
-from pepole.config import DecisionSupportSpec, RealismConfig, Scenario
-from pepole.decision_support import build_decision_support_bundle, build_tick_decision_hints
-from pepole.rules import apply_macro_inertia_blend, finalize_tick
-from pepole.state import WorldState
+from people.attribution import MACRO_ATTR_KEYS
+from people.config import DecisionSupportSpec, RealismConfig, Scenario
+from people.decision_support import build_decision_support_bundle, build_tick_decision_hints
+from people.rules import apply_macro_inertia_blend, finalize_tick
+from people.state import WorldState
 
 
 def _row(tick: int, **over: float) -> dict:

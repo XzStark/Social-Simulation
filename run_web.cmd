@@ -13,4 +13,4 @@ set PORT=8770
 echo 浏览器访问: http://127.0.0.1:%PORT%（约 2 秒后自动打开）
 echo 按 Ctrl+C 停止服务
 start "" cmd /c "timeout /t 2 /nobreak >nul & start "" http://127.0.0.1:%PORT%/"
-python -m uvicorn pepole.webapp:app --host 127.0.0.1 --port %PORT%
+python -m uvicorn people.webapp:app --host 127.0.0.1 --port %PORT%

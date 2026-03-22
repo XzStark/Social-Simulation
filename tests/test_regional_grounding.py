@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from pepole.config import Scenario
-from pepole.engine import RunConfig
-from pepole.providers.dry_run import DryRunClient
-from pepole.regional_grounding import apply_regional_grounding, prebake_regional_grounding_for_ensemble
+from people.config import Scenario
+from people.engine import RunConfig
+from people.providers.dry_run import DryRunClient
+from people.regional_grounding import apply_regional_grounding, prebake_regional_grounding_for_ensemble
 
 
 def test_apply_regional_grounding_prepends_digest() -> None:
@@ -36,7 +36,7 @@ def test_apply_regional_grounding_prepends_digest() -> None:
 
 
 def test_web_search_injects_snippet(monkeypatch: pytest.MonkeyPatch) -> None:
-    from pepole import regional_grounding as rg_mod
+    from people import regional_grounding as rg_mod
 
     def _fake_fetch(_scenario: Scenario, _rg: object) -> tuple[str, dict]:
         return "· 标题\n  https://example.com\n  摘要", {"used": True, "provider": "test"}

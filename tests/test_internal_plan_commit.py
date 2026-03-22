@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import random
 
-from pepole.config import OperationalFinance, Scenario
-from pepole.engine import _hydrate_finance, build_initial_state
-from pepole.internal_plan_commit import (
+from people.config import OperationalFinance, Scenario
+from people.engine import _hydrate_finance, build_initial_state
+from people.internal_plan_commit import (
     apply_confirmed_internal_plan,
     estimate_commitment_tick_offset,
     fire_due_internal_commitments,

@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- 默认后端地址；仅当 API 不在 127.0.0.1:8770 时再改 content -->
-  <meta name="pepole-api-origin" content="http://127.0.0.1:8770" />
-  <title>pepole — 社会与市场反响演练</title>
+  <meta name="people-api-origin" content="http://127.0.0.1:8770" />
+  <title>people — 社会与市场反响演练</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
   <style>
@@ -280,7 +280,7 @@
   </style>
 </head>
 <body>
-  <h1>pepole 演练台</h1>
+  <h1>people 演练台</h1>
   <p class="sub">流式展示 tick、媒体报道倾向、机构与合作报价、账面/财力与时间线展望（今天→月→年，态势好可见 2～3 年）。遇 YAML 配置的危机点会<strong>暂停</strong>，须由你输入处置方案后再续跑，引擎不会自动替你「解决」。<strong>不必手写 YAML</strong>也可改「政策/企业/创业」设定：点下方<strong>场景配置向导</strong>。</p>
 
   <div class="stack">
@@ -325,11 +325,11 @@
       </div>
       <div class="row">
         <label for="primary">PRIMARY 模型（如 deepseek-reasoner）</label>
-        <input type="text" id="primary" placeholder="留空则用环境变量 PEPOLE_MODEL_PRIMARY" />
+        <input type="text" id="primary" placeholder="留空则用环境变量 PEOPLE_MODEL_PRIMARY" />
       </div>
       <div class="row">
         <label for="fast">FAST 模型（如 deepseek-chat）</label>
-        <input type="text" id="fast" placeholder="留空则用 PEPOLE_MODEL_FAST" />
+        <input type="text" id="fast" placeholder="留空则用 PEOPLE_MODEL_FAST" />
       </div>
       <div class="row">
         <label for="key">OpenAI 兼容 API Key（可选，填了会覆盖本次请求的环境变量）</label>
@@ -635,7 +635,7 @@
     let net = null;
     let netNodes = null;
     let netEdges = null;
-    window.__pepoleCheckpoint = null;
+    window.__peopleCheckpoint = null;
     window.__draftPlanCandidates = [];
     window.__lastPlanEvaluatePayload = null;
     window.__pendingInternalCommit = null;
@@ -856,26 +856,26 @@
       };
     }
 
-    let __pepoleApiBaseResolved = null;
+    let __peopleApiBaseResolved = null;
 
-    function pepoleApiMetaOrigin() {
-      const meta = document.querySelector('meta[name="pepole-api-origin"]');
+    function peopleApiMetaOrigin() {
+      const meta = document.querySelector('meta[name="people-api-origin"]');
       const m = meta && meta.getAttribute("content");
       if (m && String(m).trim()) return String(m).trim().replace(/\/$/, "");
       return null;
     }
 
-    function pepoleApiBaseGuess() {
-      const meta = pepoleApiMetaOrigin();
+    function peopleApiBaseGuess() {
+      const meta = peopleApiMetaOrigin();
       if (meta) return meta;
       const o = window.location.origin;
       if (o && o !== "null" && window.location.protocol !== "file:") return o;
       return "http://127.0.0.1:8770";
     }
 
-    function pepoleApiBaseCandidates() {
+    function peopleApiBaseCandidates() {
       const out = [];
-      const meta = pepoleApiMetaOrigin();
+      const meta = peopleApiMetaOrigin();
       if (meta) out.push(meta);
       const o = window.location.origin;
       if (o && o !== "null" && window.location.protocol !== "file:") out.push(o);
@@ -885,16 +885,16 @@
     }
 
     /** 依次探测 GET /api/scenarios，解决「页面在静态服/file 而后端在 8770」导致的 404 Not Found */
-    async function ensurePepoleApiBase() {
-      if (__pepoleApiBaseResolved) return;
-      for (const base of pepoleApiBaseCandidates()) {
+    async function ensurePeopleApiBase() {
+      if (__peopleApiBaseResolved) return;
+      for (const base of peopleApiBaseCandidates()) {
         try {
           const url = new URL("/api/scenarios", base + "/").href;
           const r = await fetch(url, { method: "GET" });
           if (!r.ok) continue;
           const j = await r.json();
           if (j && Array.isArray(j.scenarios)) {
-            __pepoleApiBaseResolved = base;
+            __peopleApiBaseResolved = base;
             return;
           }
         } catch (_) {
@@ -903,13 +903,13 @@
       }
     }
 
-    function pepoleApiUrl(path) {
+    function peopleApiUrl(path) {
       const p = path.startsWith("/") ? path : "/" + path;
-      const base = __pepoleApiBaseResolved || pepoleApiBaseGuess();
+      const base = __peopleApiBaseResolved || peopleApiBaseGuess();
       return new URL(p, base + "/").href;
     }
 
-    function formatPepoleApi404Hint(status, msg) {
+    function formatPeopleApi404Hint(status, msg) {
       if (status !== 404) return typeof msg === "string" ? msg : JSON.stringify(msg);
       const m = typeof msg === "string" ? msg : "";
       if (m.includes("未找到场景") || m.includes("checkpoint")) return m;
@@ -1320,8 +1320,8 @@
 
     async function loadScenarios() {
       let j = null;
-      if (__pepoleApiBaseResolved) {
-        const r = await fetch(pepoleApiUrl("/api/scenarios"));
+      if (__peopleApiBaseResolved) {
+        const r = await fetch(peopleApiUrl("/api/scenarios"));
         if (!r.ok) {
           const t = await r.text();
           let detail = t.slice(0, 200);
@@ -1329,18 +1329,18 @@
             const je = JSON.parse(t);
             if (je.detail) detail = typeof je.detail === "string" ? je.detail : JSON.stringify(je.detail);
           } catch (_) {}
-          throw new Error(formatPepoleApi404Hint(r.status, detail));
+          throw new Error(formatPeopleApi404Hint(r.status, detail));
         }
         j = await r.json();
       } else {
-        for (const base of pepoleApiBaseCandidates()) {
+        for (const base of peopleApiBaseCandidates()) {
           try {
             const url = new URL("/api/scenarios", base + "/").href;
             const r = await fetch(url, { method: "GET" });
             if (!r.ok) continue;
             const jj = await r.json();
             if (jj && Array.isArray(jj.scenarios)) {
-              __pepoleApiBaseResolved = base;
+              __peopleApiBaseResolved = base;
               j = jj;
               break;
             }
@@ -1349,7 +1349,7 @@
           }
         }
         if (!j) {
-          throw new Error(formatPepoleApi404Hint(404, "Not Found"));
+          throw new Error(formatPeopleApi404Hint(404, "Not Found"));
         }
       }
       const sel = document.getElementById("scenario");
@@ -1919,8 +1919,8 @@
       } else if (ph === "crisis_pause") {
         if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
         if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
-        window.__pepoleCheckpoint = ev.checkpoint_token;
-        window.__pepolePauseKind = ev.pause_kind || "crisis_rule";
+        window.__peopleCheckpoint = ev.checkpoint_token;
+        window.__peoplePauseKind = ev.pause_kind || "crisis_rule";
         window.__planEvaluations = ev.plan_evaluations || [];
         document.getElementById("crisisTitle").textContent = ev.title || "需指挥台处置";
         document.getElementById("crisisDetail").textContent = ev.detail || "";
@@ -1938,7 +1938,7 @@
         const multiHint = document.getElementById("crisisMultiHint");
         const reevalB = document.getElementById("reevalDeskBtn");
         const modB = document.getElementById("modifyDeskBtn");
-        if (window.__pepolePauseKind === "desk_review") {
+        if (window.__peoplePauseKind === "desk_review") {
           lbl.textContent = "如需改评：点「评估另一套」或「修改并重评」，编辑后提交；载入历史方案可用右上角下拉框。";
           strip.style.display = "block";
           strip.innerHTML = renderPlanEvalStrip(window.__planEvaluations);
@@ -1978,7 +1978,7 @@
           planPick.style.display = "none";
           planPickLabel.style.display = "none";
           planPick.innerHTML = "";
-          if (window.__pepolePauseKind === "risk_milestone") {
+          if (window.__peoplePauseKind === "risk_milestone") {
             lbl.textContent =
               "应对方案（多套请用 --- 分行；续跑：专业转化 + 桌面可行性；默认需再确认才继续 tick）";
           } else {
@@ -2044,10 +2044,10 @@
     }
 
     async function runScenarioStream(url, jsonBody) {
-      await ensurePepoleApiBase();
+      await ensurePeopleApiBase();
       document.getElementById("errBox").style.display = "none";
       const ac = new AbortController();
-      window.__pepoleStreamAbort = ac;
+      window.__peopleStreamAbort = ac;
       const stopBtn = document.getElementById("stopStreamBtn");
       if (stopBtn) {
         stopBtn.style.display = "inline-block";
@@ -2096,7 +2096,7 @@
         }
         throw e;
       } finally {
-        window.__pepoleStreamAbort = null;
+        window.__peopleStreamAbort = null;
         if (stopBtn) stopBtn.style.display = "none";
         releaseStreamLocks();
       }
@@ -2149,11 +2149,11 @@
       out.style.display = "block";
       out.textContent = "评估中…";
       try {
-        await ensurePepoleApiBase();
+        await ensurePeopleApiBase();
         const scen = scenarioFileForApi();
         const bindCk = document.getElementById("decisionEvalBindCkpt");
-        const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
-        if (bindCk && bindCk.checked && !window.__pepoleCheckpoint) {
+        const useCkpt = !!(window.__peopleCheckpoint && bindCk && bindCk.checked);
+        if (bindCk && bindCk.checked && !window.__peopleCheckpoint) {
           throw new Error(
             "已勾选「绑定 checkpoint」，但当前没有有效暂停快照（需先运行至暂停；服务重启后快照会丢失）。请取消勾选后仅按左侧场景评估，或重新运行至暂停后再绑定。",
           );
@@ -2169,9 +2169,9 @@
         });
         const b = document.getElementById("brief").value.trim();
         if (b) body.brief = b;
-        if (useCkpt) body.checkpoint_token = window.__pepoleCheckpoint;
+        if (useCkpt) body.checkpoint_token = window.__peopleCheckpoint;
         else delete body.checkpoint_token;
-        const res = await fetch(pepoleApiUrl("/api/plan/evaluate"), {
+        const res = await fetch(peopleApiUrl("/api/plan/evaluate"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -2189,7 +2189,7 @@
         if (!res.ok) {
           const msg = j.detail ?? j.error ?? raw.slice(0, 400) ?? res.statusText;
           const s = typeof msg === "string" ? msg : JSON.stringify(msg);
-          throw new Error(formatPepoleApi404Hint(res.status, s));
+          throw new Error(formatPeopleApi404Hint(res.status, s));
         }
         out.textContent = formatPlanEvaluateView(j);
         window.__lastPlanEvaluatePayload = j;
@@ -2239,11 +2239,11 @@
       }
       const out = document.getElementById("decisionEvalResult");
       try {
-        await ensurePepoleApiBase();
+        await ensurePeopleApiBase();
         const scen = scenarioFileForApi();
         const bindCk = document.getElementById("decisionEvalBindCkpt");
-        const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
-        if (bindCk && bindCk.checked && !window.__pepoleCheckpoint) {
+        const useCkpt = !!(window.__peopleCheckpoint && bindCk && bindCk.checked);
+        if (bindCk && bindCk.checked && !window.__peopleCheckpoint) {
           alert(
             "已勾选「绑定 checkpoint」，但当前没有有效暂停快照。请取消勾选后确认执行（仅 tick0 态势），或先运行至暂停。",
           );
@@ -2260,9 +2260,9 @@
         });
         const b = document.getElementById("brief").value.trim();
         if (b) body.brief = b;
-        if (useCkpt) body.checkpoint_token = window.__pepoleCheckpoint;
+        if (useCkpt) body.checkpoint_token = window.__peopleCheckpoint;
         else delete body.checkpoint_token;
-        const res = await fetch(pepoleApiUrl("/api/plan/confirm-execute"), {
+        const res = await fetch(peopleApiUrl("/api/plan/confirm-execute"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -2282,7 +2282,7 @@
           throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
         }
         window.__pendingInternalCommit = null;
-        if (jr.checkpoint_token) window.__pepoleCheckpoint = jr.checkpoint_token;
+        if (jr.checkpoint_token) window.__peopleCheckpoint = jr.checkpoint_token;
         else if (jr.internal_plan_commit) window.__pendingInternalCommit = jr.internal_plan_commit;
         const ap = jr.applied || {};
         const cm = ap.commitment || {};
@@ -2354,7 +2354,7 @@
     });
 
     document.getElementById("stopStreamBtn").addEventListener("click", () => {
-      const ac = window.__pepoleStreamAbort;
+      const ac = window.__peopleStreamAbort;
       if (!ac) return;
       const sb = document.getElementById("stopStreamBtn");
       if (sb) sb.disabled = true;
@@ -2362,8 +2362,8 @@
     });
 
     document.getElementById("runBtn").onclick = async () => {
-      window.__pepoleCheckpoint = null;
-      window.__pepolePauseKind = null;
+      window.__peopleCheckpoint = null;
+      window.__peoplePauseKind = null;
       window.__planEvaluations = [];
       fillHistorySelect([]);
       updateDecisionLayerPanel("");
@@ -2437,7 +2437,7 @@
         ...apiFields(),
       });
       try {
-        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/stream"), body);
+        const outcome = await runScenarioStream(peopleApiUrl("/api/run/stream"), body);
         if (outcome === "truncated") {
           document.getElementById("errBox").style.display = "block";
           document.getElementById("errBox").textContent = "流意外结束，未收到完成或暂停事件";
@@ -2454,7 +2454,7 @@
     };
 
     document.getElementById("confirmProceedBtn").onclick = async () => {
-      const tok = window.__pepoleCheckpoint;
+      const tok = window.__peopleCheckpoint;
       if (!tok) {
         alert("缺少 checkpoint，请重新开始演练");
         return;
@@ -2468,7 +2468,7 @@
       document.getElementById("crisisBackdrop").classList.remove("show");
       setRunning(true, "确认继续演练…");
       try {
-        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), {
+        const outcome = await runScenarioStream(peopleApiUrl("/api/run/resume/stream"), {
           checkpoint_token: tok,
           resume_stage: "confirm_proceed",
           selected_plan_index,
@@ -2491,7 +2491,7 @@
     };
 
     document.getElementById("financePatchApply").onclick = async () => {
-      const tok = window.__pepoleCheckpoint;
+      const tok = window.__peopleCheckpoint;
       const st = document.getElementById("financePatchStatus");
       st.textContent = "";
       if (!tok) {
@@ -2510,8 +2510,8 @@
         return;
       }
       try {
-        await ensurePepoleApiBase();
-        const r = await fetch(pepoleApiUrl("/api/finance/adjust-checkpoint"), {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/finance/adjust-checkpoint"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -2521,7 +2521,7 @@
           st.textContent = j.detail || j.error || "失败";
           return;
         }
-        window.__pepoleCheckpoint = j.checkpoint_token;
+        window.__peopleCheckpoint = j.checkpoint_token;
         st.textContent = "已切换新 checkpoint";
         document.getElementById("financePatchNote").value = "";
       } catch (e) {
@@ -2530,7 +2530,7 @@
     };
 
     document.getElementById("crisisSubmit").onclick = async () => {
-      const tok = window.__pepoleCheckpoint;
+      const tok = window.__peopleCheckpoint;
       const sol = document.getElementById("crisisSolution").value.trim();
       if (!tok) {
         alert("缺少 checkpoint，请重新开始演练");
@@ -2544,7 +2544,7 @@
       document.getElementById("crisisBackdrop").classList.remove("show");
       setRunning(true, "提交方案并研判…");
       try {
-        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
+        const outcome = await runScenarioStream(peopleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
         if (outcome === "truncated") {
           document.getElementById("errBox").style.display = "block";
           document.getElementById("errBox").textContent = "续跑流意外结束";
@@ -2562,7 +2562,7 @@
     };
 
     document.getElementById("inlineResumeBtn").onclick = async () => {
-      const tok = window.__pepoleCheckpoint;
+      const tok = window.__peopleCheckpoint;
       const sol = document.getElementById("inlineSolution").value.trim();
       if (!tok) {
         alert("当前还没有暂停点。先运行，出现“暂停”后再提交。");
@@ -2576,7 +2576,7 @@
       document.getElementById("crisisBackdrop").classList.remove("show");
       setRunning(true, "提交方案并研判…");
       try {
-        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
+        const outcome = await runScenarioStream(peopleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
         if (outcome === "truncated") {
           document.getElementById("errBox").style.display = "block";
           document.getElementById("errBox").textContent = "续跑流意外结束";
@@ -2598,11 +2598,11 @@
 
     document.getElementById("openWizardBtn").addEventListener("click", () => openScenarioWizard());
     document.getElementById("wizardCloseBtn").addEventListener("click", () => {
-      localStorage.setItem("pepole_wizard_intro_done", "1");
+      localStorage.setItem("people_wizard_intro_done", "1");
       closeScenarioWizard();
     });
     document.getElementById("wizardApplyBtn").addEventListener("click", () => {
-      localStorage.setItem("pepole_wizard_intro_done", "1");
+      localStorage.setItem("people_wizard_intro_done", "1");
       document.getElementById("scenario").value = document.getElementById("wizScenarioSelect").value;
       document.getElementById("brief").value = document.getElementById("wizBrief").value;
       window.__wizardOverrides = collectWizardOverridesFromForm();
@@ -2627,7 +2627,7 @@
       pre.textContent = "";
       setRunning(true, "ensemble 并行演练（无流式进度）…");
       try {
-        await ensurePepoleApiBase();
+        await ensurePeopleApiBase();
         const body = mergeRunRequestBody({
           scenario_file: document.getElementById("scenario").value,
           seed: parseInt(document.getElementById("seed").value, 10) || 42,
@@ -2639,10 +2639,10 @@
           ...apiFields(),
         });
         const ac = new AbortController();
-        window.__pepoleStreamAbort = ac;
+        window.__peopleStreamAbort = ac;
         let res;
         try {
-          res = await fetch(pepoleApiUrl("/api/ensemble"), {
+          res = await fetch(peopleApiUrl("/api/ensemble"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -2656,7 +2656,7 @@
           }
           throw e;
         } finally {
-          window.__pepoleStreamAbort = null;
+          window.__peopleStreamAbort = null;
         }
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -2707,7 +2707,7 @@
     initNetwork();
     loadScenarios()
       .then(() => {
-        if (!localStorage.getItem("pepole_wizard_intro_done")) {
+        if (!localStorage.getItem("people_wizard_intro_done")) {
           openScenarioWizard();
         }
       })

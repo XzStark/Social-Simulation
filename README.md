@@ -1,4 +1,4 @@
-# pepole — 政策与产品发行动作的社会 / 市场反响演练
+# people — 政策与产品发行动作的社会 / 市场反响演练
 
 **许可证**：[MIT](./LICENSE) · **参与贡献**：[CONTRIBUTING.md](./CONTRIBUTING.md) · **安全漏洞上报**：[SECURITY.md](./SECURITY.md)  
 **维护者（网名 STARK）GitHub 主页**：[github.com/XzStark](https://github.com/XzStark)  
@@ -10,7 +10,7 @@
 **系统说明（架构与机制）**：[系统说明.md](./系统说明.md)（模块职责、数据流、API、概念词典，偏技术/细致）。  
 **扩展能力、验证校准、决策辅助（曲线粘性 + 粗检）、蒙特卡洛、缺口与路线图**：见 **[系统说明.md](./系统说明.md)**（**§6.1**、§8.1、§12～§19）。  
 **政府 / 企业 / 创业团队** 的责任边界、数据与模型治理：**[系统说明.md](./系统说明.md) §1.4～§1.5**。  
-**网页界面**：先在本机设置 `OPENAI_API_KEY`（及可选 `OPENAI_BASE_URL`），再运行 **`run_web.cmd`**（默认端口 **8770**）或 `python -m uvicorn pepole.webapp:app --host 127.0.0.1 --port 8770` → http://127.0.0.1:8770  
+**网页界面**：先在本机设置 `OPENAI_API_KEY`（及可选 `OPENAI_BASE_URL`），再运行 **`run_web.cmd`**（默认端口 **8770**）或 `python -m uvicorn people.webapp:app --host 127.0.0.1 --port 8770` → http://127.0.0.1:8770  
 若报端口占用，运行 **`结束端口占用.cmd`** 或改 `run_web.cmd` 里的 `PORT`。  
 **模型与密钥**：OpenAI / ChatGPT API → **[配置示例-OpenAI-ChatGPT.cmd](./配置示例-OpenAI-ChatGPT.cmd)**；Gemini → **[配置示例-Gemini.cmd](./配置示例-Gemini.cmd)**；Claude → **[配置示例-Claude.cmd](./配置示例-Claude.cmd)**；DeepSeek → **[配置示例-DeepSeek.cmd](./配置示例-DeepSeek.cmd)**。将占位符改为你的密钥后，在该 CMD 窗口 `call` 对应文件再启动。**勿将含真实密钥的文件提交到 Git**（可用 `*.local.cmd`，见 `.gitignore`）。汇总见 **[.env.example](./.env.example)**。
 
@@ -36,7 +36,7 @@
 ## 快速开始
 
 ```bash
-cd D:\pepole
+cd D:\people
 pip install -r requirements.txt
 python main.py run --scenario scenarios/default.yaml
 python main.py run --scenario scenarios/product_launch.yaml
@@ -65,7 +65,7 @@ python main.py explain --from-json run_dump.json
 | `OPENAI_BASE_URL` | 可选；默认 `https://api.openai.com/v1` |
 | `ANTHROPIC_API_KEY` | **Claude**（Anthropic 控制台申请） |
 | `GOOGLE_API_KEY` 或 `GEMINI_API_KEY` | **Gemini**（Google AI Studio 申请，两个变量名任选其一） |
-| `PEPOLE_MODEL_PRIMARY` / `PEPOLE_MODEL_FAST` | 路由串，格式 **`厂商前缀:模型名`**（见下表） |
+| `PEOPLE_MODEL_PRIMARY` / `PEOPLE_MODEL_FAST` | 路由串，格式 **`厂商前缀:模型名`**（见下表） |
 
 **路由前缀（`main.py` / 网页「模型」框同理）**：
 
@@ -126,7 +126,7 @@ Windows 下一键写入环境变量：根目录 **`配置示例-OpenAI-ChatGPT.c
 需要 **Python 3.10+**。克隆后：
 
 ```bash
-cd pepole
+cd people
 pip install -r requirements.txt
 # 可选：可编辑安装 + 测试依赖
 pip install -e ".[dev]"

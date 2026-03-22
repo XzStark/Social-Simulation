@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from pepole.config import PEPOLE_SCENARIO_SCHEMA_VERSION, Scenario
-from pepole.engine import RunConfig, _experiment_manifest_for_run, build_initial_state
-from pepole.extension_stack import init_extensions_state, run_extension_plugins
-from pepole.experiment_manifest import scenario_content_hash
-from pepole.rules import finalize_tick
-from pepole.state import CohortState, WorldState
-from pepole.providers.registry import get_client
+from people.config import PEOPLE_SCENARIO_SCHEMA_VERSION, Scenario
+from people.engine import RunConfig, _experiment_manifest_for_run, build_initial_state
+from people.extension_stack import init_extensions_state, run_extension_plugins
+from people.experiment_manifest import scenario_content_hash
+from people.rules import finalize_tick
+from people.state import CohortState, WorldState
+from people.providers.registry import get_client
 
 
 def _minimal_scenario(**kwargs: object) -> Scenario:
@@ -33,7 +33,7 @@ def test_experiment_manifest_has_schema_and_performance() -> None:
         fast_model_slot="openai:gpt-4o-mini",
     )
     m = _experiment_manifest_for_run(s, seed=42, cfg=cfg)
-    assert m["pepole_scenario_schema"] == PEPOLE_SCENARIO_SCHEMA_VERSION
+    assert m["people_scenario_schema"] == PEOPLE_SCENARIO_SCHEMA_VERSION
     assert m["scenario_yaml_schema_version"] == s.scenario_schema_version
     assert "performance_budget" in m
     assert m["model_slots"]["primary"] == "openai:gpt-4o"

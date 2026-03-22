@@ -4,27 +4,27 @@ from pathlib import Path
 
 import yaml
 
-from pepole.causal_consistency import audit_scenario_causal_consistency
-from pepole.calibration_loop import merge_realism_into_scenario_yaml
-from pepole.config import Scenario
-from pepole.experiment_manifest import build_experiment_manifest
-from pepole.reproducibility import environment_fingerprint
+from people.causal_consistency import audit_scenario_causal_consistency
+from people.calibration_loop import merge_realism_into_scenario_yaml
+from people.config import Scenario
+from people.experiment_manifest import build_experiment_manifest
+from people.reproducibility import environment_fingerprint
 
 
 def test_environment_fingerprint_keys() -> None:
     fp = environment_fingerprint()
     assert "python" in fp
     assert "platform" in fp
-    assert "pepole_package_version" in fp
+    assert "people_package_version" in fp
 
 
 def test_manifest_includes_environment() -> None:
     s = Scenario.load("scenarios/roadmap_demo.yaml")
     m = build_experiment_manifest(
-        s, seed=1, primary_model_slot="x", fast_model_slot="y", pepole_package_version="test"
+        s, seed=1, primary_model_slot="x", fast_model_slot="y", people_package_version="test"
     )
     assert "environment" in m
-    assert m["environment"]["pepole_package_version"]
+    assert m["environment"]["people_package_version"]
 
 
 def test_causal_cycle_warning() -> None:

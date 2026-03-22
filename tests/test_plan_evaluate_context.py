@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import random
 
-from pepole.config import Scenario
-from pepole.context import build_decision_context, enrich_decision_context_for_plan_evaluate
-from pepole.engine import _hydrate_finance, build_initial_state
+from people.config import Scenario
+from people.context import build_decision_context, enrich_decision_context_for_plan_evaluate
+from people.engine import _hydrate_finance, build_initial_state
 
 
 def test_enrich_injects_plan_evaluate_live_context() -> None:

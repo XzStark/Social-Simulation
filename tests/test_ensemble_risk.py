@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pepole.config import Scenario
-from pepole.engine import summarize_ensemble
-from pepole.risk_ensemble_report import build_standard_ensemble_briefing
+from people.config import Scenario
+from people.engine import summarize_ensemble
+from people.risk_ensemble_report import build_standard_ensemble_briefing
 
 
 def _fake_results() -> list[dict]:
