@@ -63,7 +63,18 @@ class OpenAICompatClient:
                     body["response_format"] = {"type": "json_object"}
                 r = client.post(url, json=body, headers=headers)
                 if r.status_code >= 400:
-                    last_exc = RuntimeError(f"{r.status_code} {r.text[:400]}")
+                    detail = r.text[:800]
+                    hint = ""
+                    low = detail.lower()
+                    if r.status_code == 400 and (
+                        "model" in low and ("not exist" in low or "does not exist" in low or "invalid" in low)
+                    ):
+                        hint = (
+                            f" [pepole 提示：本次请求的 model={self.model!r}，API 基座={self.base_url!r}。"
+                            "模型名必须与该服务商一致：DeepSeek 一般为 deepseek-chat / deepseek-reasoner；"
+                            "OpenAI 官方为 gpt-4o 等。请检查 PEPOLE_MODEL_PRIMARY / FAST 或网页里的 PRIMARY/FAST。]"
+                        )
+                    last_exc = RuntimeError(f"{r.status_code} {detail}{hint}")
                     continue
                 try:
                     return self._parse_message_json(r.json())
