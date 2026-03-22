@@ -295,7 +295,7 @@
     <textarea id="decisionLayerDraft" rows="3" placeholder="例：声明加大研发力度，优先上线××功能；约束条件…"></textarea>
     <label class="chk-bind" style="margin-top:0.45rem;">
       <input type="checkbox" id="decisionEvalBindCkpt" />
-      <span>评估时绑定当前 checkpoint 态势（有暂停快照且勾选后，才把当时舆情/账面进度纳入上下文；<strong>默认不勾选</strong>＝仅用左侧底稿 + 指挥台要点）</span>
+      <span>评估时绑定当前 checkpoint 态势（<strong>须当前页已有暂停快照</strong>；服务重启后快照会失效，请取消勾选。勾选后纳入当时舆情/账面；<strong>默认不勾选</strong>＝仅用左侧底稿 + 指挥台要点）</span>
     </label>
     <div class="btn-row" style="margin-top:0.5rem;">
       <button type="button" class="btn-secondary" id="decisionEvalOnlyBtn">仅评估本草案（内部）</button>
@@ -1398,6 +1398,17 @@
       });
     }
 
+    /** 在现有「历史方案」列表前插入一条（如内部「确认执行」后的草案），上限 32 条 */
+    function prependDecisionHistoryEntry(entry) {
+      const prev = Array.isArray(window.__decisionHistory) ? [...window.__decisionHistory] : [];
+      prev.unshift({
+        status: entry.status || "条目",
+        plain_full: entry.plain_full || "",
+        plain_excerpt: entry.plain_excerpt || (entry.plain_full || "").slice(0, 200),
+      });
+      fillHistorySelect(prev.slice(0, 32));
+    }
+
     function renderPlanEvalStrip(pe) {
       if (!pe || !pe.length)
         return '<p class="hint" style="margin:0">（无研判明细）</p>';
@@ -2096,7 +2107,11 @@
       if (!Number.isFinite(i) || !window.__decisionHistory || !window.__decisionHistory[i]) return;
       const h = window.__decisionHistory[i];
       const t = (h.plain_full || h.plain_excerpt || "").trim();
-      if (t) document.getElementById("crisisSolution").value = t;
+      if (t) {
+        document.getElementById("crisisSolution").value = t;
+        const draft = document.getElementById("decisionLayerDraft");
+        if (draft) draft.value = t;
+      }
     });
 
     function showDeskReevalMode(prefill) {
@@ -2138,6 +2153,11 @@
         const scen = scenarioFileForApi();
         const bindCk = document.getElementById("decisionEvalBindCkpt");
         const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
+        if (bindCk && bindCk.checked && !window.__pepoleCheckpoint) {
+          throw new Error(
+            "已勾选「绑定 checkpoint」，但当前没有有效暂停快照（需先运行至暂停；服务重启后快照会丢失）。请取消勾选后仅按左侧场景评估，或重新运行至暂停后再绑定。",
+          );
+        }
         if (!useCkpt && !scen) {
           throw new Error("请先选择有效的场景 YAML（左侧下拉框），或勾选「绑定 checkpoint」使用暂停快照。");
         }
@@ -2193,7 +2213,16 @@
         updateEvalCommitmentHintFromPayload(j);
         document.getElementById("decisionEvalFollowup").style.display = "block";
       } catch (e) {
-        out.textContent = String(e);
+        const msg = String(e);
+        const bindCk = document.getElementById("decisionEvalBindCkpt");
+        if (bindCk && bindCk.checked && (msg.includes("checkpoint") || msg.includes("快照"))) {
+          bindCk.checked = false;
+          out.textContent =
+            msg +
+            "\n\n（已自动取消勾选「绑定 checkpoint」。若无暂停快照请保持不勾选；有快照时需先运行到暂停再勾选。）";
+        } else {
+          out.textContent = msg;
+        }
       }
     });
 
@@ -2214,6 +2243,12 @@
         const scen = scenarioFileForApi();
         const bindCk = document.getElementById("decisionEvalBindCkpt");
         const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
+        if (bindCk && bindCk.checked && !window.__pepoleCheckpoint) {
+          alert(
+            "已勾选「绑定 checkpoint」，但当前没有有效暂停快照。请取消勾选后确认执行（仅 tick0 态势），或先运行至暂停。",
+          );
+          return;
+        }
         if (!useCkpt && !scen) throw new Error("请选择场景 YAML，或勾选绑定 checkpoint。");
         const body = mergeRunRequestBody({
           scenario_file: scen || "default.yaml",
@@ -2268,9 +2303,28 @@
         if (hint)
           hint.innerHTML =
             "<strong>已确认执行。</strong> " +
-            (cm.due_tick != null ? "将在第 " + cm.due_tick + " tick 提示约定检视。" : "");
+            (cm.due_tick != null ? "将在第 " + cm.due_tick + " tick 提示约定检视。" : "") +
+            " 本套草案已记入弹窗内「历史方案」，上方草案框已清空，可写下一套后点「仅评估」。";
+
+        prependDecisionHistoryEntry({
+          status: "已确认·内部草案",
+          plain_full: text,
+          plain_excerpt: text.slice(0, 200),
+        });
+        document.getElementById("decisionLayerDraft").value = "";
+        document.getElementById("decisionLayerDraft").focus();
+        window.__lastPlanEvaluatePayload = null;
+        document.getElementById("decisionEvalFollowup").style.display = "none";
+        document.getElementById("historyPlanPick").value = "";
       } catch (e) {
-        alert(String(e));
+        const msg = String(e);
+        const bindCk = document.getElementById("decisionEvalBindCkpt");
+        if (bindCk && bindCk.checked && (msg.includes("checkpoint") || msg.includes("快照"))) {
+          bindCk.checked = false;
+          alert(msg + "\n\n已自动取消勾选「绑定 checkpoint」，请重试或取消绑定后确认执行。");
+        } else {
+          alert(msg);
+        }
       }
     });
 
