@@ -34,7 +34,8 @@ dependencies = [
 dev = ["pytest>=8.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/XzStark"
+Homepage = "https://github.com/XzStark/Social-Simulation"
+Repository = "https://github.com/XzStark/Social-Simulation"
 
 [tool.setuptools.packages.find]
 where = ["."]

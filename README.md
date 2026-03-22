@@ -1,7 +1,8 @@
 # pepole — 政策与产品发行动作的社会 / 市场反响演练
 
 **许可证**：[MIT](./LICENSE) · **参与贡献**：[CONTRIBUTING.md](./CONTRIBUTING.md) · **安全漏洞上报**：[SECURITY.md](./SECURITY.md)  
-**维护者（网名 STARK）GitHub 主页**：[github.com/XzStark](https://github.com/XzStark)
+**维护者（网名 STARK）GitHub 主页**：[github.com/XzStark](https://github.com/XzStark)  
+**本仓库**：[github.com/XzStark/Social-Simulation](https://github.com/XzStark/Social-Simulation)
 
 **怎么操作**：请看根目录 **[操作指南.md](./操作指南.md)**（安装、命令、改 YAML、指标含义、示例场景）。  
 **系统说明（架构与机制）**：[系统说明.md](./系统说明.md)（模块职责、数据流、API、概念词典，偏技术/细致）。  
