@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pepole"
+version = "0.1.0"
+description = "政策与产品发行动作的社会 / 市场反响演练（LLM 沙盘）"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "STARK" }]
+keywords = ["simulation", "llm", "policy", "scenario", "sandbox"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "httpx>=0.27.0",
+  "duckduckgo-search>=6.0.0",
+  "pydantic>=2.6.0",
+  "pyyaml>=6.0.1",
+  "rich>=13.7.0",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/XzStark"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pepole*"]

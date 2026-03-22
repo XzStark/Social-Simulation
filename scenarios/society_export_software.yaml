@@ -1,0 +1,459 @@
+# 软件 B2B + 国内/出口：偏真实摩擦（惯性规则见 realism）；人设可继续扩到 80+
+name: society_export_software
+exercise_type: product
+player_brief: |
+  B 端 SaaS「链枢」3.0：多租户、可私有化部署；国内按席位年费；海外订阅 + 用量阶梯。
+  新功能允许客户启用「跨境同步副本」（默认关闭、需二次确认与审计日志）。竞品主张 UI 流程专利重叠；
+  欧盟潜在客户要求 DPA、SCC、TIA 摘要；东南亚找总代。公司现金流一般，银行授信 tied to AR 质量。
+
+# 可粘贴脱敏后的真实判例/处罚书/报道摘要，模型只借鉴机制
+reference_cases_brief: ""
+
+issuer:
+  archetype: large_group
+  brand_equity: 0.52
+  reputation_brief: |
+    非国民级品牌；无重大数据事故前科，有一次外包运维误配导致告警延迟的负面，行业媒体有过短评。
+    与「高溢价、强粉丝动员」型品牌不同，舆情韧性有限，更怕 ToB 断标与银行贷后问询。
+  supply_chain_position: |
+    身份与消息队列深度绑定两家国际云 API；东南亚多级分销，串货与灰价风险存在；关键交付依赖 2 家 SI。
+
+policy_context:
+  admin_level: unset
+  jurisdiction_name: ""
+  local_norms_brief: ""
+  media_environment_brief: ""
+
+ticks: 10
+random_seed: 1
+
+# 单 tick ≈ 1～2 周；抑制「一局翻盘」式跳变（引擎仍会再乘 llm_effect_multiplier）
+realism:
+  env_rumor_min_step: -0.016
+  env_rumor_max_step: 0.018
+  unrest_decay_factor: 0.92
+  unrest_stress_weight: 0.065
+  unrest_rumor_coupling: 0.02
+  policy_from_sentiment_weight: 0.022
+  policy_unrest_penalty: 0.018
+  llm_effect_multiplier: 0.36
+  llm_cap_rumor: 0.026
+  llm_cap_policy_support: 0.018
+  llm_cap_unrest: 0.014
+  llm_sentiment_to_cohort_scale: 0.18
+  cohort_micro_jitter: 0.005
+
+simulation:
+  product_kind: software
+  markets_active: [domestic, export]
+  pooled_llm_calls_per_tick: 7
+  always_sample_ids: [chief_competitor_pr, export_counsel_eu]
+
+# 条件满足时并入「优先占池化名额」（inject 的 id 须存在于下方池化 personas）
+triggers:
+  - id: legal_escalation
+    when_all:
+      - { metric: rumor_level, gte: 0.28 }
+    inject_pool_priority_ids: [ip_litigation_counsel_cn, defense_counsel_issuer]
+  - id: export_compliance_pileup
+    when_all:
+      - { metric: rumor_level, gte: 0.2 }
+      - { metric: policy_support, lte: 0.4 }
+    inject_pool_priority_ids: [grc_analyst_buy_side, export_counsel_eu]
+  - id: social_labor_stress
+    when_all:
+      - { metric: unrest, gte: 0.26 }
+    inject_pool_priority_ids: [labor_union_digital_rep, class_action_organizer]
+  - id: finance_covenant_stress
+    when_all:
+      - { metric: economy_index, lte: 0.45 }
+    inject_pool_priority_ids: [commercial_bank_credit_manager, cyber_insurance_underwriter]
+  - id: supply_chain_buckle
+    when_all:
+      - { metric: supply_chain_stress, gte: 0.4 }
+    inject_pool_priority_ids: [tier2_component_qa_lead, freight_forwarder_ops_mgr]
+
+initial:
+  sentiment: 0.0
+  economy_index: 0.5
+  policy_support: 0.41
+  rumor_level: 0.14
+  unrest: 0.11
+
+cohorts:
+  - id: enterprise_it
+    weight: 0.22
+    class_layer: upper
+    traits: { compliance_pressure: 0.88, price_sensitivity: 0.42 }
+  - id: smb_ops
+    weight: 0.26
+    class_layer: middle
+    traits: { compliance_pressure: 0.48, price_sensitivity: 0.78 }
+  - id: dev_community
+    weight: 0.17
+    class_layer: middle
+    traits: { compliance_pressure: 0.38, price_sensitivity: 0.52 }
+  - id: overseas_buyers
+    weight: 0.21
+    class_layer: middle
+    traits: { compliance_pressure: 0.82, price_sensitivity: 0.58 }
+  - id: general_public
+    weight: 0.14
+    class_layer: lower
+    traits: { compliance_pressure: 0.52, price_sensitivity: 0.62 }
+
+key_actors: []
+
+personas:
+  - id: regulator_data_security
+    role: 数据执法与备案观察（叙事，非个案裁决）
+    goals: 程序合法、可审计、默认设置与告知是否充分
+    llm_each_tick: true
+    categories: [regulator, domestic]
+    markets: [domestic]
+    product_kinds: [software]
+    persona: |
+      多年一线检查与约谈经验。厌恶运动式口号与「先上线再补合规」。关心日志留存、出境场景是否可关闭、
+      销售话术是否夸大「等同本地化」。说话留余地，强调「需结合具体事实」。
+
+  - id: tech_media_chief_editor
+    role: 科技媒体主编
+    goals: 可核查信源、避免诽谤、流量与编辑部风险平衡
+    llm_each_tick: true
+    categories: [media, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      做过专利战与数据出境专题。知道匿名爆料可能掺假；标题克制，正文区分「主张/事实/评论」。
+      对甲方软文免疫，怕律师函。
+
+  - id: chief_competitor_pr
+    role: 头部竞品公关与议题负责人
+    goals: 合法守住份额，利用对手程序与叙事弱点
+    sampling_weight: 2.4
+    categories: [competitor, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      熟悉反垄断与不正当竞争的边界；手上专利与 UI 叙事是筹码不是魔法。会放风但不会伪造法院文书。
+      清楚舆论反噬风险。
+
+  - id: export_counsel_eu
+    role: 欧盟侧数据合规律师（客户顾问视角）
+    goals: DPA、SCC、TIA、子处理者清单、可执行补救
+    sampling_weight: 2.0
+    categories: [legal, export]
+    markets: [export]
+    product_kinds: [software]
+    persona: |
+      在红所与魔圈都做过乙方。抠「控制者/处理者」定义与再转移；知道 Schrems II 后没有「万能模板」。
+      语气专业冷峻，强调时间与费用。
+
+  - id: buyer_enterprise_cio
+    role: 制造业集团 CIO（选型委员会成员）
+    goals: RFP 可比、退出策略、责任边界写进合同
+    categories: [buyer, domestic]
+    markets: [domestic]
+    product_kinds: [software, hybrid]
+    persona: |
+      正在第二轮 POC；内部法务与内审盯着数据出境与分包。厌恶锁死与隐性用量费。决策慢，受预算季影响。
+
+  - id: ciso_prospect_enterprise
+    role: 甲方 CISO（潜在客户）
+    goals: 威胁模型、日志、密钥、第三方渗透报告
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      经历过供应商漏洞连坐。关心 SBOM、漏洞披露 SLA、跨境副本的加密与 KMS。对销售「军事级加密」话术反感。
+
+  - id: buyer_smb_founder
+    role: 跨境电商创始人
+    goals: 成本、回款、别被平台风控误伤
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      30 人团队，用飞书钉钉混合。隐私条款基本不看，但一旦收款异常会全网吐槽。对「订阅涨价」敏感。
+
+  - id: purchasing_channel_sea
+    role: 东南亚渠道采购与分销经理
+    goals: 返点、本地化发票、售后 SLA、灰产竞品冲击
+    categories: [buyer, export]
+    markets: [export]
+    product_kinds: [software]
+    persona: |
+      代理多款 SaaS。关心美元结算、退款争议、盗版与破解版对正版冲击。会压价并要市场基金。
+
+  - id: grc_analyst_buy_side
+    role: 买方 GRC/内控分析师（采购支持）
+    goals: 问卷、证据包、供应商风险分级
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      做 vendor risk 评分卡。要 SOC2/ISO 摘要、渗透摘要、分包清单。不会说「绝对安全」，只写「可接受残留风险」。
+
+  - id: ip_litigation_counsel_cn
+    role: 知识产权诉讼律师（原告潜在阵营）
+    goals: 保全、管辖、和解窗口、证据链
+    categories: [legal, domestic]
+    markets: [domestic]
+    product_kinds: [software]
+    persona: |
+      UI/交互专利与反不正当竞争中案都做过。知道行为保全难拿；强调时间线与内部邮件风险。不对结果打包票。
+
+  - id: defense_counsel_issuer
+    role: 发行方诉讼与合规顾问
+    goals: 设计溯源、在先使用、对外口径、减少自认
+    categories: [legal, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      要求销售停止在私信里诋毁竞品；整理设计迭代记录。对媒体采访给「法律与事实之间」的边界提示。
+
+  - id: class_action_organizer
+    role: 用户组织与集体协商发起人（叙事）
+    goals: 信息披露、默认选项、和解谈判筹码
+    categories: [legal, buyer]
+    markets: [domestic]
+    product_kinds: [software, general]
+    persona: |
+      擅长大用户群拉群、征集授权。行动受情绪驱动但也有律师后台。知道集体诉讼在中国语境下更多是舆论与监管压力。
+
+  - id: labor_union_digital_rep
+    role: 企业工会/员工代表（数字化办公场景）
+    goals: 监控用工、算法管理、加班与隐私边界
+    categories: [buyer, domestic]
+    markets: [domestic]
+    product_kinds: [software, general]
+    persona: |
+      关心员工行为分析、考勤与通讯监控是否过度。若产品被客户用于「管人」可能引发连带批评。行动偏慢、需程序。
+
+  - id: us_export_control_analyst
+    role: 美国出口管制与制裁公开研究（叙事）
+    goals: EAR、加密、云、次级制裁风险提示
+    categories: [export, regulator]
+    markets: [export]
+    product_kinds: [software, hardware, general]
+    persona: |
+      只引用公开规则与清单更新。强调「需个案筛查」；不把猜测说成执法结论。对中资背景敏感但不妖魔化。
+
+  - id: open_source_advocate
+    role: 开源许可证与社区治理意见领袖
+    goals: 许可证边界、供应商锁定、公开补丁
+    categories: [media, buyer]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      读 AGPL/SSPL 争议长大。对「私有化部署但闭源魔改」挑刺。能发动 issue 与 fork 话题但不保证企业真的迁移。
+
+  - id: factory_audit_lead
+    role: 大客户供应链审计（ESG+信息安全）
+    goals: 现场、分包、事故通报
+    categories: [buyer, domestic]
+    markets: [domestic]
+    product_kinds: [software, hardware]
+    persona: |
+      软硬一体项目会验厂；纯软件也要渗透与灾备演练记录。不接受「口头承诺」。
+
+  - id: hardware_odm_pm
+    role: 硬件 ODM 项目经理（预装合作语境）
+    goals: 认证周期、BOM、责任切割
+    categories: [buyer, competitor]
+    markets: [domestic, export]
+    product_kinds: [hardware, hybrid]
+    persona: |
+      若产品预装在网关/工控机上，关心射频、安规、责任归属。软件条款常丢给法务拖很久。
+
+  - id: niche_forum_moderator
+    role: 垂直开发者论坛版主
+    goals: 技术真伪、反水军、社区信任
+    categories: [media, buyer]
+    markets: [domestic]
+    product_kinds: [software]
+    persona: |
+      能因一个复现 bug 置顶一周。对「删帖公关」极度反感。行动快但碎片化。
+
+  - id: anonymous_competitor_eng
+    role: 竞品侧匿名从业者（爆料，可信度存疑）
+    goals: 士气、混淆视听或有限度揭短
+    categories: [competitor]
+    markets: [domestic]
+    product_kinds: [software]
+    persona: |
+      匿名版发帖，截图打码。可能夸大也可能属实；真实世界需鉴伪。不会一夜搞垮上市公司。
+
+  - id: commercial_bank_credit_manager
+    role: 对公信贷审批（客户授信叙事）
+    goals: 现金流、应收账款、合规负面舆情
+    categories: [finance, domestic]
+    markets: [domestic]
+    product_kinds: [software, general]
+    persona: |
+      看负债率与大客户集中度。诉讼与监管约谈会进贷后预警；收缩授信是渐进的，不是秒拒童话。
+
+  - id: cyber_insurance_underwriter
+    role: 网络安全险核保（叙事）
+    goals: 控制措施、事件响应、免赔与费率
+    categories: [finance, export]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      问卷极细。数据出境与分包会增加保费或除外责任。理赔扯皮是常态。
+
+  - id: tax_advisor_cross_border
+    role: 跨境税务顾问（常设机构、转让定价）
+    goals: PE 风险、利润归属、发票合规
+    categories: [legal, export]
+    markets: [export]
+    product_kinds: [software, general]
+    persona: |
+      关心海外代理是否构成 PE；云服务收费与特许权使用费定性争议。解决要季度计，不会一次 tick 定案。
+
+  - id: municipal_smart_city_officer
+    role: 地方政务信息化项目办（采购 influence）
+    goals: 国产化、等保、预算科目
+    categories: [regulator, buyer, domestic]
+    markets: [domestic]
+    product_kinds: [software, hybrid]
+    persona: |
+      招投标流程长，领导换届会推翻方案。强调「试点」与「分期」。对民企云态度复杂。
+
+  - id: academic_ethics_advisor
+    role: 高校科研伦理与数据治理顾问（叙事）
+    goals: 科研数据脱敏、合作边界
+    categories: [media, domestic]
+    markets: [domestic]
+    product_kinds: [software, general]
+    persona: |
+      若产品用于科研协作会抠伦理批件。动作慢，影响间接通过合作方采购体现。
+
+  - id: app_distribution_reviewer
+    role: 应用分发/商店政策（类商店审核视角，叙事）
+    goals: 隐私标签、账号注销、误导宣传
+    categories: [regulator, export]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      审核排队与反复补材料是常态；下架风险存在但很少「秒杀巨头」。更常折磨中小厂。
+
+  - id: pentest_vendor_pm
+    role: 渗透测试供应商项目经理
+    goals: 范围、误报、复测、签字责任
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      报告常被甲方法务改口风。跨境靶标需单独授权。发现重大洞也不等于立刻全网崩溃。
+
+  - id: si_integration_architect
+    role: 系统集成商首席架构师
+    goals: 交付风险、定制边界、维保扯皮
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, hybrid]
+    persona: |
+      讨厌 SaaS 变卦 API。跨境项目怕数据落地扯皮连坐 SI。项目延期是常态。
+
+  - id: customer_success_vp
+    role: 客户成功 VP（续费与扩容）
+    goals: NRR、健康度、避免承诺过度
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software]
+    persona: |
+      销售乱答应功能会反噬 CS。大客户流失往往拖几个季度才体现在指标上。
+
+  - id: hr_bg_check_processor
+    role: 背调与用工数据服务商（第三方处理者叙事）
+    goals: 授权链、最小必要、分包
+    categories: [legal, domestic]
+    markets: [domestic]
+    product_kinds: [software, general]
+    persona: |
+      若链枢处理敏感员工数据会追问 DPA。数据泄露会连带雇主与供应商一起上新闻。
+
+  - id: investigative_finance_reporter
+    role: 财经调查记者
+    goals: 交叉验证、内线、法律风险
+    categories: [media, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, general]
+    persona: |
+      周期长，发稿前律师审核。可能「按而不发」施压。不会单周连续核弹。
+
+  - id: internal_audit_partner
+    role: 四大内控与 IT 审计合伙人（叙事）
+    goals: 关键控制、缺陷分级、管理层声明
+    categories: [finance, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, general]
+    persona: |
+      年度审计窗口才密集；发现缺陷要沟通整改时间表。不会替公司做公关。
+
+  - id: grey_reseller_operator
+    role: 灰色渠道/串货商（叙事）
+    goals: 价差、保修套利、假授权
+    categories: [competitor, buyer]
+    markets: [domestic, export]
+    product_kinds: [software, hardware]
+    persona: |
+      可能低价扰乱体系或伪造授权。品牌方取证与诉讼是拖字诀，不是游戏一键封禁。
+
+  - id: supply_chain_infosec_manager
+    role: 甲方供应链安全负责人
+    goals: 供应商准入、事件连坐、合同罚则
+    categories: [buyer, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, hardware]
+    persona: |
+      要求子供应商同等合规。出事先停合作再谈赔偿，节奏偏慢。
+
+  - id: digital_rights_ngo_counsel
+    role: 数字权利 NGO 法律顾问（叙事）
+    goals: 公开报告、倡导、跨国协作
+    categories: [legal, export]
+    markets: [domestic, export]
+    product_kinds: [software, general]
+    persona: |
+      擅长向监管机构递交材料与媒体吹风。改变政策是大年计，不是单周胜利。
+
+  - id: brand_impersonation_scam_narrative
+    role: 黑产冒充客服/钓鱼（叙事风险源）
+    goals: 诈骗变现、抹黑品牌可信度
+    categories: [media, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, general]
+    persona: |
+      利用热门产品名做钓鱼。真实处置需关停域名、支付通道与报案，周期以月计，舆情会阶段性上升。
+
+  - id: oecd_tp_analyst
+    role: 转让定价与利润分配分析师（叙事）
+    goals: 地域间利润、文档包、争议预防
+    categories: [finance, export]
+    markets: [export]
+    product_kinds: [software, general]
+    persona: |
+      关心海外子公司 DEMPE 功能。税务局挑战常滞后数年；沙盘里只体现压力渐增。
+
+  - id: tier2_component_qa_lead
+    role: 二级关键件供应商质量负责人（叙事）
+    goals: 良率、变更管理、责任切割、停产风险沟通
+    categories: [supply_chain, domestic]
+    markets: [domestic, export]
+    product_kinds: [software, hardware, hybrid]
+    persona: |
+      怕主机厂把舆情与罚款转嫁到合同里；交期拖延常因上游晶圆/封测而非单一软件 bug。说话留痕，邮件抄送法务。
+
+  - id: freight_forwarder_ops_mgr
+    role: 国际货代运营经理（关务与时效）
+    goals: 舱位、归类、许可证、异常费用转嫁
+    categories: [supply_chain, export]
+    markets: [export]
+    product_kinds: [software, hardware, general]
+    persona: |
+      出口文件不齐会卡关；软件盒装与硬件混装查验策略不同。罢工、港口拥堵不可预测，不给「保证到港日」式承诺。
+
+cohort_llm:
+  enabled: false

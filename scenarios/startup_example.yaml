@@ -1,0 +1,91 @@
+# 创业公司产品侧：人少、现金紧、职能合并；白话处置与部门链按 archetype: startup 自动切换
+name: startup_hardware_coldstart
+exercise_type: product
+player_brief: |
+  硬件众筹「口袋气象站」首批 2000 台发货延迟；社群出现「跑路」段子；
+  代工厂要求预付下一批物料，账上现金只够撑约 6 周固定开支。
+
+issuer:
+  archetype: startup
+  brand_equity: 0.28
+  reputation_brief: |
+    无上市公司背书；创始人个人 IP 与产品绑定，一次失信会连带人身攻击。
+  supply_chain_position: 单一 SMT 厂 + 一家电池供应商，切换成本高。
+
+policy_context:
+  admin_level: unset
+  jurisdiction_name: ""
+  local_norms_brief: ""
+  media_environment_brief: ""
+
+reference_cases_brief: ""
+
+ticks: 10
+random_seed: 7
+
+initial:
+  sentiment: -0.02
+  economy_index: 0.5
+  policy_support: 0.35
+  rumor_level: 0.22
+  unrest: 0.1
+
+cohorts:
+  - id: backers_angry
+    weight: 0.25
+    class_layer: lower
+    traits: { price_sensitivity: 0.85, tech_savvy: 0.4 }
+  - id: makers_sympathetic
+    weight: 0.15
+    class_layer: middle
+    traits: { tech_savvy: 0.75, price_sensitivity: 0.35 }
+  - id: silent_majority
+    weight: 0.45
+    class_layer: middle
+    traits: { tech_savvy: 0.35, price_sensitivity: 0.65 }
+  - id: angel_lp_watchers
+    weight: 0.15
+    class_layer: upper
+    traits: { tech_savvy: 0.5, price_sensitivity: 0.2 }
+
+operational_finance:
+  enabled: true
+  cash_balance_million: 62
+  operating_cost_million_per_tick: 9
+
+institutions:
+  - id: maker_forum_mod
+    name: 创客论坛版务（非官媒）
+    tier: small
+    focus_brief: 维权帖与发货时间线对比图传播快
+
+cooperations:
+  - id: legal_retainer_topup
+    name: 外包律师加急函（催货+声明）
+    cost_million: 4.5
+    partner_tier: small
+    brief: 48h 内出第一版，不含诉讼
+
+crisis_rules:
+  - id: rumor_runaway
+    when_all:
+      - metric: rumor_level
+        gte: 0.28
+    title: 「跑路」叙事外溢
+    detail: |
+      短视频切片在放大「众筹=骗局」模板；代工厂观望是否暂停产线。
+      请指挥台用白话写：是否部分退款/换权益、如何披露时间表与证据、创始人是否出镜等。
+    once: true
+
+key_actors:
+  - id: supply_boss
+    role: 代工厂商务总监
+    goals: 现金流安全、产线不断档、规避连带舆情
+    categories: []
+  - id: tech_youtuber
+    role: 数码博主（中小体量）
+    goals: 事实核查、不伤粉丝信任、有话题度
+    categories: [media]
+
+cohort_llm:
+  enabled: false

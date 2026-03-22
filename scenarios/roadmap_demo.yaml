@@ -1,0 +1,99 @@
+# 演示 Scenario.extensions 全量扩展项（默认关中的各项在此打开，便于 dry-run / 回归；说明见 系统说明.md §12）
+name: roadmap_extensions_demo
+exercise_type: policy
+player_brief: |
+  演示用短设定：一项省级公共服务数字化改造的沟通与舆情推演（可配合 dry-run 模型快速跑通管线）。
+
+policy_context:
+  admin_level: province
+  jurisdiction_name: 某省
+  local_norms_brief: "省会与地市差异大。"
+  media_environment_brief: "融媒与自媒体并存。"
+
+reference_cases_brief: ""
+
+issuer:
+  archetype: large_group
+  brand_equity: 0.5
+
+ticks: 6
+random_seed: 1
+
+initial:
+  sentiment: 0.0
+  economy_index: 0.5
+  policy_support: 0.44
+  rumor_level: 0.08
+  unrest: 0.14
+
+cohorts:
+  - id: urban_youth
+    weight: 0.4
+    class_layer: middle
+  - id: suburban_family
+    weight: 0.35
+    class_layer: middle
+  - id: rural_older
+    weight: 0.25
+    class_layer: lower
+
+key_actors:
+  - id: regulator
+    role: 监管机构官员
+    goals: 稳预期
+  - id: media_editor
+    role: 省级媒体编辑
+    goals: 可报道、可核实
+
+cohort_llm:
+  enabled: false
+
+# —— extensions 全开演示（见 系统说明.md §12）——
+extensions:
+  causal:
+    enabled: true
+    rules:
+      - id: unrest_amplifies_rumor
+        when_all:
+          - metric: unrest
+            gte: 0.35
+        effects:
+          - metric: rumor_level
+            add: 0.015
+  ground_truth:
+    enabled: true
+    blend_alpha: 0.1
+    series:
+      policy_support: [0.44, 0.445, 0.45, 0.452, 0.455, 0.46]
+      rumor_level: [0.08, 0.085, 0.09, 0.088, 0.09, 0.091]
+  kpi:
+    enabled: true
+  diffusion:
+    enabled: true
+    beta: 0.12
+    gamma: 0.06
+    rumor_coupling: 0.28
+    seed_informed: 0.05
+  delay:
+    enabled: true
+    schedule:
+      - due_tick: 2
+        deltas:
+          rumor_level: 0.02
+        note: 信息滞后释放（演练）
+      - due_tick: 5
+        deltas:
+          unrest: -0.015
+        note: 处置见效（演练假设）
+  resources:
+    enabled: true
+    manpower_initial: 80.0
+    political_capital_initial: 90.0
+  behavior_micro:
+    enabled: true
+    rating_jitter_sigma: 0.04
+  rl_stub:
+    enabled: true
+  multimodal_stub:
+    enabled: true
+  validation_trace: true

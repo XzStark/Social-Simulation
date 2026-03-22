@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+out.json
+*.egg-info/
+dist/
+build/
+
+# 密钥与本地覆盖（切勿提交）
+.env
+.env.*
+!.env.example
+*.local.cmd
+
+# 测试与工具
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / 系统
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,122 @@
+# 集团/产品发行方：发布产品与营销动作，观察细分人群与舆论场反响
+name: product_launch_sandbox
+exercise_type: product
+player_brief: |
+  发布智能家居中枢「家核 X1」：首发价 999 元，订阅制高级功能 19 元/月；
+  主打「本地推理、录像不上云」；首发渠道为电商直播 + 3C 线下店；
+  宣传语「你的家，数据留在家里」。竞品已占据 60% 份额，价格带相近。
+
+issuer:
+  archetype: startup
+  brand_equity: 0.38
+  reputation_brief: |
+    新品牌，无历史包袱也无粉丝基本盘；一次品控翻车即可伤筋动骨。对标小米级国民度不现实，更像冷启动。
+  supply_chain_position: 代工单一、核心模组两家供应商，缺货会直接影响发货承诺。
+
+policy_context:
+  admin_level: unset
+  jurisdiction_name: ""
+  local_norms_brief: ""
+  media_environment_brief: ""
+
+reference_cases_brief: ""
+
+ticks: 12
+random_seed: 42
+
+initial:
+  sentiment: 0.05
+  economy_index: 0.55
+  policy_support: 0.42   # 本场景下解释为对品牌/产品的支持度 proxy
+  rumor_level: 0.12
+  unrest: 0.08           # 可理解为争议/抵制强度 proxy
+
+cohorts:
+  - id: early_adopters
+    weight: 0.18
+    class_layer: middle
+    traits: { tech_savvy: 0.9, price_sensitivity: 0.35 }
+  - id: family_mainstream
+    weight: 0.32
+    class_layer: middle
+    traits: { tech_savvy: 0.45, price_sensitivity: 0.6 }
+  - id: privacy_activists
+    weight: 0.12
+    class_layer: middle
+    traits: { tech_savvy: 0.55, price_sensitivity: 0.4 }
+  - id: budget_conscious
+    weight: 0.28
+    class_layer: lower
+    traits: { tech_savvy: 0.4, price_sensitivity: 0.9 }
+  - id: enterprise_it
+    weight: 0.10
+    class_layer: upper
+    traits: { tech_savvy: 0.85, price_sensitivity: 0.3 }
+
+operational_finance:
+  enabled: true
+  cash_balance_million: 420
+  operating_cost_million_per_tick: 28
+
+institutions:
+  - id: regional_blog_ring
+    name: 区域数码博主联盟
+    tier: small
+    focus_brief: 首发测评与「信号」口碑，反转快、易被切片误读
+  - id: national_wire_desk
+    name: 央媒科技观察（驻站）
+    tier: authority
+    focus_brief: 定调谨慎，常引用监管口径与标准表述
+
+cooperations:
+  - id: kol_pack
+    name: KOL 组合投放包（短视频+直播切片）
+    cost_million: 18
+    partner_tier: small
+    brief: 效果难审计，适合冷启动试水
+  - id: uni_privacy_backing
+    name: 高校联合隐私合规背书
+    cost_million: 95
+    partner_tier: authority
+    brief: 联合实验室与白皮书，周期长、费用高
+
+# 条件满足时本 tick 结束后暂停，须网页端输入处置方案并调用续跑，引擎不会自动替你收场
+crisis_rules:
+  - id: rumor_spike
+    when_all:
+      - metric: rumor_level
+        gte: 0.18
+    title: 谣言与误读链升温
+    detail: |
+      社交链出现「偷上传云」等截图，真伪未查实；竞品段子号在放大。
+      请指挥台明确：技术披露边界、公关口径、是否启动第三方检测与监管沟通节奏。
+    once: true
+
+# 结构化「多家竞品」：注入 decision_context.market_competitors，智能体与社交回合须承认竞争格局。
+# 另在 key_actors 里用 categories: [competitor] 落具体发言人（可与 linked_key_actor_id 对齐）。
+market_competitors:
+  - id: incumbent_smart_home_ecosystem
+    name: 头部智能家居生态（匿名合成）
+    brief: 已占约六成份额；账号与云联动强；近年跟进本地推理叙事，渠道与售后网点多。
+    estimated_market_share_proxy: 0.58
+    linked_key_actor_id: competitor_pr
+  - id: value_white_label_band
+    name: 白牌与性价比带（合成）
+    brief: 低价占位、功能清单趋同；固件与售后口碑参差，常拉低品类均价与预期。
+    estimated_market_share_proxy: 0.15
+
+key_actors:
+  - id: tech_media
+    role: 科技媒体主编
+    goals: 可验证事实、避免被公关带节奏、流量与公信力平衡
+    categories: [media]
+  - id: consumer_regulator
+    role: 消保/网信条线观察员（舆论视角）
+    goals: 合规宣传、用户知情权、未成年人与老人权益
+  - id: competitor_pr
+    role: 竞品公关负责人
+    goals: 强调自家生态与售后、弱化对手差异化叙事
+    categories: [competitor]
+
+cohort_llm:
+  enabled: false

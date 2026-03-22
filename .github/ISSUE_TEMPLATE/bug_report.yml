@@ -1,0 +1,33 @@
+name: 缺陷 / 使用异常
+description: 报告可复现的错误或异常行为（请勿在此贴 API 密钥）
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        安全漏洞请勿公开描述，请见 [SECURITY.md](../../SECURITY.md)。
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: 操作系统、`python --version`、如何启动（CLI / Web）等
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从克隆或打开页面开始，尽量逐步写清
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期 vs 实际
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其它（日志片段、场景文件名等）
+      description: 可粘贴脱敏后的报错；不要贴真实密钥

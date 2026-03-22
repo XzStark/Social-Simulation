@@ -1,0 +1,90 @@
+# 示例：地区情境检索 + 社区火锅店（product）
+# 运行前请配置 API Key 或使用 DryRun。
+name: regional_hotpot_chengdu_demo
+exercise_type: product
+player_brief: |
+  计划在成都市某社区旁新开一家川味火锅店（约 120 座），主打平价套餐与夜宵；
+  宣传侧重「本地食材、明厨亮灶」；开业前希望评估周边居民、小商户与基层网格的可能反应。
+
+reference_cases_brief: ""
+
+issuer:
+  archetype: sme
+  brand_equity: 0.42
+  reputation_brief: 新创餐饮牌，无历史负面
+  supply_chain_position: 本地食材为主，冷链依赖中等
+
+ticks: 6
+random_seed: 11
+
+policy_context:
+  admin_level: city
+  jurisdiction_name: 四川省成都市（某区/街道级情境）
+  local_norms_brief: 社区熟人网络强，短视频与业主群传播快；夜市与餐饮竞争饱和。
+  media_environment_brief: 本地生活号、团购评价与县区级融媒体并存。
+
+initial:
+  sentiment: 0.05
+  economy_index: 0.52
+  policy_support: 0.48
+  rumor_level: 0.08
+  unrest: 0.12
+
+cohorts:
+  - id: urban_youth
+    weight: 0.32
+    class_layer: middle
+    traits: { media_exposure: 0.88, risk_aversion: 0.42 }
+  - id: suburban_family
+    weight: 0.28
+    class_layer: middle
+    traits: { media_exposure: 0.55, risk_aversion: 0.58 }
+  - id: business_owners
+    weight: 0.14
+    class_layer: upper
+    traits: { media_exposure: 0.5, risk_aversion: 0.35 }
+  - id: rural_migrant_workers
+    weight: 0.26
+    class_layer: lower
+    traits: { media_exposure: 0.72, risk_aversion: 0.48 }
+
+key_actors:
+  - id: county_market_regulation
+    role: 市场监管一线
+    goals: 食安投诉与抽检节奏、证照与现场核查
+    persona: 关注明厨亮灶与油烟投诉，措辞偏程序
+    categories: [legal]
+
+simulation:
+  product_kind: general
+  markets_active: [domestic]
+  pooled_llm_calls_per_tick: 3
+
+realism:
+  llm_effect_multiplier: 0.36
+
+operational_finance:
+  enabled: true
+  cash_balance_million: 12
+  operating_cost_million_per_tick: 0.55
+  industry_operating_cost_multiplier: 1.05
+  auto_scale_operating_cost_from_issuer: true
+  revenue_proxy_million_per_tick: 1.8
+  effective_tax_rate_on_revenue: 0.12
+  track_parallel_fiscal_pool: true
+  parallel_fiscal_pool_initial_billion: 0.05
+  company_tax_mirror_to_fiscal_fraction: 1.0
+  debt_principal_million: 6
+  debt_interest_annual_rate_proxy: 0.06
+  debt_principal_repay_million_per_tick: 0.08
+
+regional_grounding:
+  enabled: true
+  region_label: 四川省成都市
+  mode: wikipedia_then_llm
+  business_scale: street_shop
+  business_sector_brief: 社区火锅店（中餐、夜宵、明火油烟）
+  user_known_local_policy_brief: ""
+  user_known_central_policy_brief: ""
+
+scenario_schema_version: "2.2"

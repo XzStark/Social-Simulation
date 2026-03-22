@@ -1,0 +1,2665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 默认后端地址；仅当 API 不在 127.0.0.1:8770 时再改 content -->
+  <meta name="pepole-api-origin" content="http://127.0.0.1:8770" />
+  <title>pepole — 社会与市场反响演练</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3d8bfd;
+      --ok: #3ecf8e;
+      --err: #f7768e;
+      --net-bg1: #0d1118;
+      --net-bg2: #151c28;
+      --net-glow: rgba(61, 139, 253, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1.25rem;
+      line-height: 1.5;
+      max-width: 1420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.25rem 0; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      border: 1px solid #2a3544;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid #3d4d63;
+      background: #121a24;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.65rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .row { margin-bottom: 0.85rem; }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.75rem; }
+    .metrics { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.75rem; }
+    .pill {
+      background: #121a24;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      border: 1px solid #2a3544;
+    }
+    #narrative {
+      max-height: 420px;
+      overflow: auto;
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+      background: #121a24;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #2a3544;
+    }
+    .error { color: var(--err); white-space: pre-wrap; font-size: 0.85rem; }
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #fff4;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: sp 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    canvas { max-height: 300px; }
+    #chartExt { max-height: 280px; }
+    #ensembleChart { max-height: 300px; }
+    #liveDetail {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      min-height: 1.25rem;
+      word-break: break-word;
+    }
+    #financeSnapshot {
+      margin-top: 0.55rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #2e4a6e;
+      background: linear-gradient(135deg, #141c28 0%, #162030 100%);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+    #financeSnapshot .fs-muted { color: var(--muted); font-size: 0.8rem; }
+    #financeSnapshot .fs-row { display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: baseline; }
+    #financeSnapshot .fs-item strong { color: #94e2d5; font-weight: 600; margin-right: 0.35rem; }
+    #financeSnapshot .fs-item span.val { color: var(--text); font-variant-numeric: tabular-nums; }
+    #chartFinance { max-height: 260px; }
+    .stack { display: flex; flex-direction: column; gap: 1rem; }
+    .horizon-wrap { display: grid; gap: 0.65rem; }
+    .hz strong { color: var(--accent); font-size: 0.82rem; display: block; margin-bottom: 0.2rem; }
+    .hz p { margin: 0; font-size: 0.82rem; color: var(--text); line-height: 1.45; }
+    .detail-wrap { max-height: 340px; overflow: auto; font-size: 0.8rem; }
+    .detail-item {
+      border-left: 3px solid var(--accent);
+      padding: 0.4rem 0.55rem;
+      margin-bottom: 0.45rem;
+      background: #121a24;
+      border-radius: 4px;
+    }
+    .detail-item.unfav { border-left-color: var(--err); }
+    .detail-item .dt { color: var(--muted); font-size: 0.72rem; margin-bottom: 0.15rem; }
+    .net-panel {
+      border-radius: 12px;
+      border: 1px solid #2e3f56;
+      background:
+        radial-gradient(ellipse 120% 80% at 50% 0%, var(--net-glow) 0%, transparent 55%),
+        linear-gradient(165deg, var(--net-bg1) 0%, var(--net-bg2) 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    .net-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid #2a354488;
+      background: rgba(0,0,0,0.2);
+    }
+    .net-toolbar button {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .net-toolbar .net-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .net-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .net-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #fff3; }
+    #interactionGraph {
+      height: min(520px, 58vh);
+      min-height: 380px;
+      background: transparent;
+    }
+    #riskBoard { margin-top: 0.55rem; font-size: 0.82rem; color: #cfd8e6; }
+    .ensemble-panel .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 0.5rem;
+    }
+    @media (max-width: 900px) { .ensemble-panel .row2 { grid-template-columns: 1fr 1fr; } }
+    .ensemble-panel input[type="number"] { width: 100%; }
+    #ensembleSummary {
+      font-size: 0.78rem;
+      color: #b8c5d6;
+      background: #121a24;
+      border: 1px solid #2a3544;
+      border-radius: 8px;
+      padding: 0.65rem;
+      margin-top: 0.65rem;
+      max-height: 200px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .risk-bad { color: var(--err); }
+    .risk-warn { color: #e0af68; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 100;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal-box {
+      background: var(--card); border-radius: 12px; max-width: 540px; width: 100%;
+      padding: 1.2rem 1.35rem; border: 1px solid #3d4d63;
+      position: relative;
+    }
+    .modal-box.wide { max-width: 720px; }
+    .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem; }
+    .modal-head h3 { flex: 1; margin: 0; font-size: 1.05rem; }
+    .history-pick label { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 0.2rem; }
+    .history-pick select { font-size: 0.8rem; max-width: 12rem; }
+    .modal-box h3 { margin: 0 0 0.5rem 0; font-size: 1.05rem; }
+    button.btn-secondary { background: #3d4d63; }
+    button.btn-secondary:hover { filter: brightness(1.08); }
+    .eval-strip {
+      font-size: 0.82rem; background: #121a24; border: 1px solid #2a3544; border-radius: 8px;
+      padding: 0.65rem 0.75rem; margin: 0.5rem 0 0.75rem 0; max-height: 220px; overflow: auto;
+    }
+    .eval-strip .pe-plan { margin-bottom: 0.65rem; padding-bottom: 0.55rem; border-bottom: 1px solid #2a3544; }
+    .eval-strip .pe-plan:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-top: 0.5rem; }
+    .dl-card {
+      background: #121a24; border: 1px solid #2e3d52; border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.75rem;
+    }
+    .dl-card pre { margin: 0.35rem 0 0 0; font-size: 0.78rem; white-space: pre-wrap; color: #b8c5d6; max-height: 200px; overflow: auto; }
+    .modal-box .crisis-body { color: var(--text); font-size: 0.88rem; margin-bottom: 0.85rem; white-space: pre-wrap; }
+    .modal-actions { margin-top: 0.75rem; }
+    .wizard-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .wizard-backdrop.show { display: flex; }
+    .wizard-box {
+      background: var(--card); border-radius: 12px; max-width: 680px; width: 100%;
+      max-height: 92vh; overflow: auto; padding: 1.15rem 1.3rem; border: 1px solid #3d4d63;
+    }
+    .wizard-box h2 { margin: 0 0 0.35rem 0; font-size: 1.15rem; }
+    .wiz-intro { font-size: 0.86rem; color: var(--muted); margin-bottom: 0.85rem; line-height: 1.55; }
+    .wiz-steps { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .wiz-steps span {
+      font-size: 0.72rem; padding: 0.2rem 0.45rem; border-radius: 4px; background: #121a24; color: var(--muted);
+      border: 1px solid #2a3544;
+    }
+    .wiz-steps span.on { color: var(--accent); border-color: var(--accent); }
+    fieldset.wiz-fs { border: 1px solid #2e3d52; border-radius: 8px; margin: 0 0 0.75rem 0; padding: 0.65rem 0.75rem; }
+    fieldset.wiz-fs legend { font-size: 0.82rem; color: var(--accent); padding: 0 0.35rem; }
+    .wiz-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.65rem; }
+    .wiz-presets button { font-size: 0.82rem; padding: 0.45rem 0.65rem; }
+    .wiz-hint { font-size: 0.78rem; color: var(--muted); margin: 0.25rem 0 0.4rem 0; line-height: 1.45; }
+    .wiz-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    @media (max-width: 560px) { .wiz-row2 { grid-template-columns: 1fr; } }
+    label.chk-bind {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.45;
+      cursor: pointer;
+    }
+    label.chk-bind input { width: auto; margin-top: 0.2rem; flex-shrink: 0; }
+    #liveLog {
+      margin-top: 0.65rem;
+      max-height: 260px;
+      overflow: auto;
+      font-size: 0.75rem;
+      font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+      background: #121a24;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid #2a3544;
+      white-space: pre-wrap;
+      color: #b8c5d6;
+    }
+  </style>
+</head>
+<body>
+  <h1>pepole 演练台</h1>
+  <p class="sub">流式展示 tick、媒体报道倾向、机构与合作报价、账面/财力与时间线展望（今天→月→年，态势好可见 2～3 年）。遇 YAML 配置的危机点会<strong>暂停</strong>，须由你输入处置方案后再续跑，引擎不会自动替你「解决」。<strong>不必手写 YAML</strong>也可改「政策/企业/创业」设定：点下方<strong>场景配置向导</strong>。</p>
+
+  <div class="stack">
+  <div class="card">
+    <label>指挥台决策层（确认后的方案会长期注入机关/公司内部上下文）</label>
+    <p class="hint" style="margin:0 0 0.5rem 0;">
+      <strong>内部「仅评估」可随时点击</strong>（含<strong>流式运行中</strong>）：独立请求、不中断主演练、不推进 tick。默认按左侧底稿 + 指挥台要点；若已暂停且勾选「绑定 checkpoint」，则纳入该快照态势。评估会<strong>综合</strong>场景与可用快照（资金/财力/债务、人力与政治资本、宏观与 cohort、叙事、记忆、决策层指令、地区情境、机构与合作等），再输出专业转化 + 桌面研判及资源粗估。页面上<strong>账面现金 / 负债</strong>以沙盘记账数值为主（演练用 proxy）；请在 YAML 的 <code>operational_finance</code> 写明真实体量对应的初值，未写且仍为模板默认时引擎会按发主体量档位生成写意初值，便于叙事自洽。
+    </p>
+    <div id="decisionLayerActive" class="dl-card" style="display:none;"></div>
+    <div id="decisionLayerActivePlaceholder" class="hint" style="margin:0 0 0.5rem 0;">尚未确认方案：待桌面研判并点「确认继续演练」后，此处显示已固化指令摘要。</div>
+    <label for="decisionLayerDraft">草案（不自动推进 tick）</label>
+    <textarea id="decisionLayerDraft" rows="3" placeholder="例：声明加大研发力度，优先上线××功能；约束条件…"></textarea>
+    <label class="chk-bind" style="margin-top:0.45rem;">
+      <input type="checkbox" id="decisionEvalBindCkpt" />
+      <span>评估时绑定当前 checkpoint 态势（有暂停快照且勾选后，才把当时舆情/账面进度纳入上下文；<strong>默认不勾选</strong>＝仅用左侧底稿 + 指挥台要点）</span>
+    </label>
+    <div class="btn-row" style="margin-top:0.5rem;">
+      <button type="button" class="btn-secondary" id="decisionEvalOnlyBtn">仅评估本草案（内部）</button>
+    </div>
+    <pre id="decisionEvalResult" style="display:none;margin-top:0.5rem;font-size:0.78rem;white-space:pre-wrap;background:#121a24;padding:0.55rem;border-radius:6px;border:1px solid #2a3544;color:#b8c5d6;max-height:240px;overflow:auto;"></pre>
+    <div id="decisionEvalFollowup" style="display:none;margin-top:0.5rem;">
+      <p id="evalCommitmentHint" class="hint" style="margin:0 0 0.4rem 0;color:#a8b4c4;"></p>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" id="decisionConfirmExecBtn">确认执行本方案</button>
+        <button type="button" class="btn-secondary" id="decisionDiscardEvalBtn">不采纳，另写一套</button>
+      </div>
+      <label for="draftPlanCandidateSelect" style="margin-top:0.5rem;display:block;">候选草案（多次评估会累积，选中可载入上方文本框）</label>
+      <select id="draftPlanCandidateSelect" style="width:100%;max-width:480px;margin-top:0.25rem;padding:0.35rem;border-radius:6px;background:#121a24;border:1px solid #2a3544;color:#e7ecf3;">
+        <option value="">— 选一套载入 —</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <div class="row">
+        <label for="scenario">场景文件（scenarios/*.yaml）</label>
+        <select id="scenario"></select>
+      </div>
+      <div class="row">
+        <label for="seed">随机种子</label>
+        <input type="number" id="seed" value="42" />
+      </div>
+      <div class="row">
+        <label for="primary">PRIMARY 模型（如 deepseek-reasoner）</label>
+        <input type="text" id="primary" placeholder="留空则用环境变量 PEPOLE_MODEL_PRIMARY" />
+      </div>
+      <div class="row">
+        <label for="fast">FAST 模型（如 deepseek-chat）</label>
+        <input type="text" id="fast" placeholder="留空则用 PEPOLE_MODEL_FAST" />
+      </div>
+      <div class="row">
+        <label for="key">OpenAI 兼容 API Key（可选，填了会覆盖本次请求的环境变量）</label>
+        <input type="password" id="key" autocomplete="off" placeholder="DeepSeek 时与 OPENAI_API_KEY 相同" />
+      </div>
+      <div class="row">
+        <label for="base">Base URL（DeepSeek: https://api.deepseek.com/v1）</label>
+        <input type="text" id="base" placeholder="留空则用环境变量；无环境变量且模型含 deepseek 时会自动用 DeepSeek 端点" />
+      </div>
+      <p class="hint" style="margin-top:-0.35rem;">
+        仅用 DeepSeek 时：建议填写上项 Base URL；若留空，请保证 PRIMARY/FAST（或环境变量里的模型名）含 <code>deepseek</code>，否则请求会默认打到 <code>api.openai.com</code> 导致密钥无效。
+      </p>
+      <div class="row">
+        <label for="brief">指挥台要点 player_brief（可选，与向导里「要点」同步）</label>
+        <textarea id="brief" placeholder="不填则使用 YAML 内原文。向导可一键填入范例。"></textarea>
+      </div>
+      <div class="btn-row" style="margin-bottom:0.65rem;">
+        <button type="button" class="btn-secondary" id="openWizardBtn">场景配置向导</button>
+        <span class="hint" style="margin:0;" id="wizardStatusHint">未应用向导覆盖（使用 YAML 原样 + 上框要点）。</span>
+      </div>
+      <div class="btn-row" style="align-items:center;">
+        <button type="button" id="runBtn">开始运行</button>
+        <button type="button" id="stopStreamBtn" class="btn-secondary" style="display:none;">停止运行</button>
+      </div>
+      <p class="hint">流式运行时可点「停止运行」断开浏览器连接（后端可能仍会收尾片刻；未暂停则无新 checkpoint）。若未填 Key 且环境变量也无 Key，将使用 Dry-Run 占位输出。</p>
+    </div>
+
+    <div class="card">
+      <label>运行状态</label>
+      <p id="status">就绪</p>
+      <div id="liveDetail"></div>
+      <div id="financeSnapshot" class="fs-muted">尚未运行；启用财务后此处显示账面现金、财力池与债务。</div>
+      <pre id="liveLog" style="display:none;"></pre>
+      <div id="headerInfo" class="metrics"></div>
+      <div id="finalMetrics" class="metrics"></div>
+      <div class="row" style="margin-top:1rem;">
+        <label>宏观指标随 tick（流式运行时每 tick 更新）</label>
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="row" style="margin-top:0.75rem;">
+        <label>扩展指标（KPI · 扩散 · 资源池等，有数据时显示）</label>
+        <canvas id="chartExt"></canvas>
+      </div>
+      <div class="row" id="chartFinanceRow" style="margin-top:0.75rem; display:none;">
+        <label>财务 proxy（百万 / 十亿；量纲与上图宏观 0～1 不同，单独展示）</label>
+        <canvas id="chartFinance"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card ensemble-panel">
+    <label>蒙特卡洛 / 终局分布（并行多次完整演练，非流式）</label>
+    <p class="hint" style="margin:0 0 0.5rem 0;">与左侧同场景、同 Key；结果含分位数与阈值命中估计。次数多时会占满 CPU，请酌情调 workers。</p>
+    <div class="row2">
+      <div>
+        <label for="ensRuns">并行次数 runs</label>
+        <input type="number" id="ensRuns" value="12" min="1" max="256" />
+      </div>
+      <div>
+        <label for="ensWorkers">workers</label>
+        <input type="number" id="ensWorkers" value="4" min="1" max="64" />
+      </div>
+      <div>
+        <label for="ensThKey">阈值指标</label>
+        <input type="text" id="ensThKey" value="policy_support" placeholder="policy_support" />
+      </div>
+      <div>
+        <label for="ensThVal">阈值</label>
+        <input type="number" id="ensThVal" value="0.55" step="0.01" />
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:0.65rem;">
+      <button type="button" class="btn-secondary" id="ensembleBtn">估计终局分布</button>
+      <span class="hint" style="margin:0;" id="ensembleHint"></span>
+    </div>
+    <pre id="ensembleSummary" style="display:none;"></pre>
+    <div class="row" style="margin-top:0.75rem;">
+      <label>分位数对比（p10 / p50 / p90）</label>
+      <canvas id="ensembleChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>时间线展望（每 tick 末由快模型更新）</label>
+    <div id="horizonPanel" class="horizon-wrap"><p class="hint" style="margin:0;">运行后显示：今天～本周 / 约一月 / 约一年；若信任与支持度持续偏强，可出现两年、三年情景（非承诺）。</p></div>
+  </div>
+
+  <div class="card">
+    <label>运行细节（机构脉搏、合作报价与账面、媒体报道等）</label>
+    <div id="detailPanel" class="detail-wrap"><p class="hint" style="margin:0;">细节随 tick 追加；不利报道会标红边。</p></div>
+  </div>
+
+  <div class="card">
+    <label>交流网络图（跨主体沟通；同向边已合并，线宽 ≈ 互动次数）</label>
+    <div class="net-panel">
+      <div class="net-toolbar">
+        <button type="button" class="btn-secondary" id="netFitBtn" title="缩放以容纳全部节点">适应画布</button>
+        <button type="button" class="btn-secondary" id="netStabBtn" title="重新力导向稳定">重新布局</button>
+        <button type="button" class="btn-secondary" id="netPhysicsBtn" title="暂停/继续物理引擎">物理：开</button>
+        <div class="net-legend" aria-hidden="true">
+          <span><i class="net-dot" style="background:#3d8bfd;"></i>机构/角色</span>
+          <span><i class="net-dot" style="background:#a855f7;"></i>公众/用户群</span>
+          <span><i class="net-dot" style="background:#f59e0b;"></i>监管</span>
+          <span><i class="net-dot" style="background:#22d3ee;"></i>政务·媒体</span>
+          <span><i class="net-dot" style="background:#84cc16;"></i>企业回应</span>
+        </div>
+      </div>
+      <div id="interactionGraph"></div>
+    </div>
+    <div id="riskBoard">等待运行中...</div>
+  </div>
+
+  <div class="card">
+    <label>叙事日志</label>
+    <div id="narrative"></div>
+    <pre id="errBox" class="error" style="display:none;margin-top:0.75rem;"></pre>
+  </div>
+  </div>
+
+  <div id="crisisBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3 id="crisisTitle">危机 — 需指挥台处置</h3>
+        <div class="history-pick">
+          <label for="historyPlanPick">历史方案</label>
+          <select id="historyPlanPick" title="载入此前研判或改评前的方案全文">
+            <option value="">— 选择载入 —</option>
+          </select>
+        </div>
+      </div>
+      <div id="planEvalStrip" class="eval-strip" style="display:none;"></div>
+      <details
+        class="finance-patch"
+        style="margin: 0.4rem 0 0.6rem; border: 1px solid #2a3544; border-radius: 6px; padding: 0.35rem 0.55rem; background: #1a222d"
+      >
+        <summary style="cursor: pointer; color: #8fafd4; font-size: 0.88rem">财务手工调账（改写 checkpoint 内现金/财力/债务）</summary>
+        <p class="hint" style="font-size: 0.78rem; margin: 0.35rem 0 0.4rem; color: #8b9cb3">
+          留空的项不改。提交后返回<strong>新 checkpoint</strong>，本页会自动切换；续跑与再次调账请用新 token。单位：现金/债务=百万 proxy，财力=十亿
+          proxy。
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center">
+          <label style="font-size: 0.8rem" for="financePatchCash">现金</label>
+          <input type="number" step="any" id="financePatchCash" placeholder="set 百万" style="width: 6.5rem" />
+          <label style="font-size: 0.8rem" for="financePatchFiscal">财力池</label>
+          <input type="number" step="any" id="financePatchFiscal" placeholder="set 十亿" style="width: 6.5rem" />
+          <label style="font-size: 0.8rem" for="financePatchDebt">债务本金</label>
+          <input type="number" step="any" id="financePatchDebt" placeholder="set 百万" style="width: 6.5rem" />
+        </div>
+        <input
+          type="text"
+          id="financePatchNote"
+          placeholder="备注（写入叙事，如：补贴到账 / 税费返还）"
+          style="width: 100%; margin-top: 0.35rem; box-sizing: border-box"
+        />
+        <button type="button" id="financePatchApply" class="btn-secondary" style="margin-top: 0.35rem">应用调账</button>
+        <span id="financePatchStatus" class="hint" style="font-size: 0.78rem; margin-left: 0.5rem"></span>
+      </details>
+      <div id="crisisDetail" class="crisis-body"></div>
+      <label id="crisisSolutionLabel" for="crisisSolution">处置方案（将写入叙事并进入后续各智能体上下文）</label>
+      <textarea id="crisisSolution" rows="6" placeholder="一套方案直接写；多套方案请用单独一行 --- 分隔每一段。"></textarea>
+      <p id="crisisMultiHint" class="hint" style="font-size:0.82rem;margin:0.35rem 0 0.5rem 0;">
+        流程：先提交 → 自动专业转化 + 桌面可行性 + <strong>阶段周期（演练估计）</strong> → 在下方确认或改评。多套方案将分别研判；默认需再点「确认继续」才进入下一 tick。
+      </p>
+      <label id="planPickLabel" for="planPick" style="display:none;margin-top:0.5rem">选用主执行线（写入决策层与叙事）</label>
+      <select id="planPick" style="display:none;width:100%;margin:0.25rem 0 0.5rem 0"></select>
+      <div class="modal-actions btn-row" id="deskReviewBar" style="display:none;">
+        <button type="button" id="confirmProceedBtn" style="display:none">确认继续演练</button>
+        <button type="button" class="btn-secondary" id="reevalDeskBtn" style="display:none">评估另一套方案</button>
+        <button type="button" class="btn-secondary" id="modifyDeskBtn" style="display:none">修改并重评</button>
+      </div>
+      <div class="modal-actions btn-row" id="crisisSubmitBar">
+        <button type="button" id="crisisSubmit">提交方案并研判</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="wizardBackdrop" class="wizard-backdrop" aria-hidden="true">
+    <div class="wizard-box">
+      <h2 id="wizardTitle">场景配置向导</h2>
+      <p class="wiz-intro" id="wizardWelcome">
+        <strong>第一次用？</strong>不必先学 YAML：选好底稿文件后，用本向导填写<strong>政策机关</strong>或<strong>企业/创业</strong>情境与<strong>本轮要点</strong>。这些内容会<strong>仅在本次 HTTP 请求中合并</strong>进场景，<strong>不会改写</strong>磁盘上的 <code>.yaml</code>。高级人设、危机规则、cohort 权重等仍来自 YAML；要深度定制可继续直接改文件。
+      </p>
+      <div class="wiz-steps" id="wizardStepBar">
+        <span class="on">1 底稿</span><span>2 类型</span><span>3 情境</span><span>4 要点</span>
+      </div>
+      <p class="wiz-hint" style="margin-top:0">也可先点<strong>预设</strong>再微调：</p>
+      <div class="wiz-presets">
+        <button type="button" class="btn-secondary" data-preset="policy_province">预设 · 省级政策</button>
+        <button type="button" class="btn-secondary" data-preset="policy_county">预设 · 县级执行</button>
+        <button type="button" class="btn-secondary" data-preset="product_group">预设 · 集团产品</button>
+        <button type="button" class="btn-secondary" data-preset="product_startup">预设 · 创业公司</button>
+        <button type="button" class="btn-secondary" data-preset="clear">清空向导字段</button>
+      </div>
+      <fieldset class="wiz-fs">
+        <legend>1 · 场景底稿（YAML）</legend>
+        <p class="wiz-hint">下拉选择与主页一致的 <code>scenarios/*.yaml</code>。底稿决定智能体池、危机规则、随机种子以外的静态结构。</p>
+        <label for="wizScenarioSelect">底稿文件</label>
+        <select id="wizScenarioSelect"></select>
+      </fieldset>
+      <fieldset class="wiz-fs">
+        <legend>2 · 演练类型</legend>
+        <p class="wiz-hint"><strong>政策 policy</strong>：机关制定/沟通措施，侧重大众对政策与施政的反应。<strong>产品 product</strong>：企业发布产品或营销动作，侧重市场、渠道与舆情。</p>
+        <label for="wizExerciseType">覆盖为</label>
+        <select id="wizExerciseType">
+          <option value="">（不覆盖，沿用 YAML）</option>
+          <option value="policy">policy · 政策制定者演练</option>
+          <option value="product">product · 产品/集团发行演练</option>
+        </select>
+      </fieldset>
+      <fieldset class="wiz-fs" id="wizPolicyFields">
+        <legend>3a · 政策侧（policy_context）</legend>
+        <p class="wiz-hint">与 YAML 中 <code>policy_context</code> 同义；留空则沿用底稿原文。</p>
+        <div class="row">
+          <label for="wizAdminLevel">行政层级</label>
+          <select id="wizAdminLevel">
+            <option value="">（不覆盖）</option>
+            <option value="unset">unset</option>
+            <option value="central">central · 中央/部委</option>
+            <option value="province">province · 省</option>
+            <option value="city">city · 市</option>
+            <option value="county">county · 县/区</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="wizJurisdiction">地名 jurisdiction_name</label>
+          <input id="wizJurisdiction" type="text" placeholder="例：某省 / 某市某区" />
+        </div>
+        <div class="row">
+          <label for="wizLocalNorms">民风与社会 local_norms_brief</label>
+          <textarea id="wizLocalNorms" rows="2" placeholder="县域人情、短视频、业主群等"></textarea>
+        </div>
+        <div class="row">
+          <label for="wizMediaEnv">媒体环境 media_environment_brief</label>
+          <textarea id="wizMediaEnv" rows="2" placeholder="省融媒、市场化财经媒体、自媒体断章等"></textarea>
+        </div>
+      </fieldset>
+      <fieldset class="wiz-fs" id="wizProductFields">
+        <legend>3b · 企业侧（issuer）</legend>
+        <p class="wiz-hint"><code>megacorp</code> 国民级品牌；<code>large_group</code> 行业龙头；<code>sme</code> 中小企业；<code>startup</code> 创业团队（人少、现金紧、外包多）。</p>
+        <div class="row">
+          <label for="wizArchetype">发行方类型 archetype</label>
+          <select id="wizArchetype">
+            <option value="">（不覆盖）</option>
+            <option value="megacorp">megacorp</option>
+            <option value="large_group">large_group</option>
+            <option value="sme">sme</option>
+            <option value="startup">startup</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="wizBrandEquity">品牌资产 brand_equity（0～1）</label>
+          <input id="wizBrandEquity" type="number" min="0" max="1" step="0.05" placeholder="留空不覆盖" />
+        </div>
+        <div class="row">
+          <label for="wizReputation">声誉叙事 reputation_brief</label>
+          <textarea id="wizReputation" rows="2" placeholder="近期待改善或信任积累等"></textarea>
+        </div>
+        <div class="row">
+          <label for="wizSupplyChain">供应链 supply_chain_position</label>
+          <input id="wizSupplyChain" type="text" placeholder="关键件对外依存、产能等" />
+        </div>
+      </fieldset>
+      <fieldset class="wiz-fs">
+        <legend>3c · 运行参数（可选）</legend>
+        <div class="wiz-row2">
+          <div class="row">
+            <label for="wizTicks">总 tick 数</label>
+            <input id="wizTicks" type="number" min="1" placeholder="不覆盖" />
+          </div>
+          <div class="row">
+            <label for="wizSalience">议题刚需 problem_salience（0～1）</label>
+            <input id="wizSalience" type="number" min="0" max="1" step="0.05" placeholder="不覆盖" />
+          </div>
+        </div>
+        <p class="wiz-hint">刚需越高，负面舆情对支持度/信任的边际冲击通常越大（仍受品牌缓冲）。</p>
+      </fieldset>
+      <fieldset class="wiz-fs">
+        <legend>4 · 本轮指挥台要点 player_brief</legend>
+        <p class="wiz-hint">写清你本轮要推的<strong>政策要点</strong>或<strong>产品/营销动作</strong>；将同步到主页「指挥台要点」并写入本次运行。</p>
+        <textarea id="wizBrief" rows="5" placeholder="例：拟出台××办法草案要点；或：发布××产品，定价与渠道策略…"></textarea>
+      </fieldset>
+      <div class="btn-row">
+        <button type="button" id="wizardApplyBtn">应用到本次运行</button>
+        <button type="button" class="btn-secondary" id="wizardCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>处置输入（出现“暂停”时在这里输入并继续）</label>
+    <textarea id="inlineSolution" rows="4" placeholder="暂停时在此输入方案（多套可用一行 --- 分隔），再点右侧提交"></textarea>
+    <div class="modal-actions">
+      <button type="button" id="inlineResumeBtn">提交并继续演练</button>
+      <span class="hint" id="inlineHint">当前未进入暂停状态。</span>
+    </div>
+  </div>
+
+  <script>
+    let chart = null;
+    let chartExt = null;
+    let chartFinance = null;
+    let ensembleChart = null;
+    let net = null;
+    let netNodes = null;
+    let netEdges = null;
+    window.__pepoleCheckpoint = null;
+    window.__draftPlanCandidates = [];
+    window.__lastPlanEvaluatePayload = null;
+    window.__pendingInternalCommit = null;
+    window.__wizardOverrides = {};
+    window.__metricsHistory = [];
+    window.__netEdgeAgg = new Map();
+    window.__netDidInitialFit = false;
+    let netPhysicsUser = false;
+
+    const NET_PHYSICS = {
+      enabled: true,
+      barnesHut: {
+        gravitationalConstant: -28000,
+        centralGravity: 0.3,
+        springLength: 200,
+        springConstant: 0.052,
+        damping: 0.45,
+        avoidOverlap: 0.88,
+      },
+      stabilization: { enabled: true, iterations: 240, updateInterval: 20 },
+    };
+
+    function classifyNetworkGroup(id, label) {
+      const L = String(label || id || "");
+      if (/用户群|公众|网友|消费者|购买者|群体|社群|业主/.test(L)) return "cohort";
+      if (/监管|执法|处罚|稽查|合规机关/.test(L)) return "regulator";
+      if (/媒体|广电|新闻|报社|频道|主编|编辑|通讯社/.test(L)) return "media";
+      if (/企业|公司|集团|品牌|公关|发言人|执行团队|董办/.test(L)) return "enterprise";
+      return "actor";
+    }
+
+    function edgeColorForKind(kind) {
+      const k = kind || "cross_actor_coordination";
+      if (k === "regulator_contact") return { line: "#fbbf24", hi: "#fde68a" };
+      if (k === "gov_media_coordination") return { line: "#22d3ee", hi: "#a5f3fc" };
+      if (k === "enterprise_media_response") return { line: "#a3e635", hi: "#d9f99d" };
+      return { line: "#7aa2f7", hi: "#c7d2fe" };
+    }
+
+    function updateNetPhysicsBtn() {
+      const b = document.getElementById("netPhysicsBtn");
+      if (!b || !net) return;
+      const on = netPhysicsUser;
+      b.textContent = on ? "物理：开" : "物理：关";
+    }
+
+    function syncWizardScenarioOptions() {
+      const main = document.getElementById("scenario");
+      const wiz = document.getElementById("wizScenarioSelect");
+      if (!main || !wiz) return;
+      wiz.innerHTML = main.innerHTML;
+      wiz.value = main.value;
+    }
+
+    function collectWizardOverridesFromForm() {
+      const o = {};
+      const et = document.getElementById("wizExerciseType").value;
+      if (et) o.exercise_type = et;
+      const al = document.getElementById("wizAdminLevel").value;
+      if (al) o.policy_admin_level = al;
+      const ju = document.getElementById("wizJurisdiction").value.trim();
+      if (ju) o.policy_jurisdiction_name = ju;
+      const ln = document.getElementById("wizLocalNorms").value.trim();
+      if (ln) o.local_norms_brief = ln;
+      const me = document.getElementById("wizMediaEnv").value.trim();
+      if (me) o.media_environment_brief = me;
+      const ar = document.getElementById("wizArchetype").value;
+      if (ar) o.issuer_archetype = ar;
+      const be = document.getElementById("wizBrandEquity").value.trim();
+      if (be !== "") {
+        const n = Number(be);
+        if (Number.isFinite(n)) o.brand_equity = n;
+      }
+      const rep = document.getElementById("wizReputation").value.trim();
+      if (rep) o.reputation_brief = rep;
+      const sc = document.getElementById("wizSupplyChain").value.trim();
+      if (sc) o.supply_chain_position = sc;
+      const tk = document.getElementById("wizTicks").value.trim();
+      if (tk !== "") {
+        const n = parseInt(tk, 10);
+        if (Number.isFinite(n) && n >= 1) o.ticks = n;
+      }
+      const ps = document.getElementById("wizSalience").value.trim();
+      if (ps !== "") {
+        const n = Number(ps);
+        if (Number.isFinite(n)) o.problem_salience = n;
+      }
+      return o;
+    }
+
+    function updateWizardStatusHint() {
+      const el = document.getElementById("wizardStatusHint");
+      if (!el) return;
+      const n = Object.keys(window.__wizardOverrides || {}).length;
+      if (n === 0) {
+        el.textContent = "未应用向导覆盖（使用 YAML 原样 + 上框「指挥台要点」）。";
+        return;
+      }
+      el.textContent =
+        "已应用 " + n + " 项向导覆盖（要点以主页「指挥台要点」为准；不含在计数内）。再次打开向导可改。";
+    }
+
+    function openScenarioWizard() {
+      syncWizardScenarioOptions();
+      const b = document.getElementById("brief").value;
+      if (!document.getElementById("wizBrief").value.trim() && b.trim()) {
+        document.getElementById("wizBrief").value = b;
+      }
+      document.getElementById("wizardBackdrop").classList.add("show");
+    }
+
+    function closeScenarioWizard() {
+      document.getElementById("wizardBackdrop").classList.remove("show");
+    }
+
+    function applyWizardPreset(key) {
+      if (key === "clear") {
+        document.getElementById("wizExerciseType").value = "";
+        document.getElementById("wizAdminLevel").value = "";
+        document.getElementById("wizJurisdiction").value = "";
+        document.getElementById("wizLocalNorms").value = "";
+        document.getElementById("wizMediaEnv").value = "";
+        document.getElementById("wizArchetype").value = "";
+        document.getElementById("wizBrandEquity").value = "";
+        document.getElementById("wizReputation").value = "";
+        document.getElementById("wizSupplyChain").value = "";
+        document.getElementById("wizTicks").value = "";
+        document.getElementById("wizSalience").value = "";
+        document.getElementById("wizBrief").value = "";
+        window.__wizardOverrides = {};
+        updateWizardStatusHint();
+        return;
+      }
+      if (key === "policy_province") {
+        document.getElementById("wizExerciseType").value = "policy";
+        document.getElementById("wizAdminLevel").value = "province";
+        document.getElementById("wizJurisdiction").value = "某省";
+        document.getElementById("wizLocalNorms").value =
+          "省会与地市差异大；县域人情网络强，短视频传播快。";
+        document.getElementById("wizMediaEnv").value =
+          "省级融媒与市场化财经媒体并存，自媒体断章风险高。";
+        document.getElementById("wizBrief").value =
+          "拟就××领域出台省级管理办法草案：过渡期、备案与罚则要点；需兼顾中小企业负担与公众知情权。";
+      } else if (key === "policy_county") {
+        document.getElementById("wizExerciseType").value = "policy";
+        document.getElementById("wizAdminLevel").value = "county";
+        document.getElementById("wizJurisdiction").value = "某县";
+        document.getElementById("wizLocalNorms").value =
+          "乡镇熟人社会明显；外出务工与留守群体信息渠道不同；业主群与短视频影响大。";
+        document.getElementById("wizMediaEnv").value =
+          "县融媒体为主，上级媒体监督与网络舆情并存。";
+        document.getElementById("wizBrief").value =
+          "县级落实上级××政策：数据台账口径、窗口服务与信访压力测试；需写清执行边界。";
+      } else if (key === "product_group") {
+        document.getElementById("wizExerciseType").value = "product";
+        document.getElementById("wizArchetype").value = "large_group";
+        document.getElementById("wizBrandEquity").value = "0.62";
+        document.getElementById("wizReputation").value =
+          "行业龙头，渠道议价强；近期一次品控舆情余波未完全消散。";
+        document.getElementById("wizSupplyChain").value =
+          "核心部件多源备份；旺季产能与交付承诺需对齐。";
+        document.getElementById("wizBrief").value =
+          "发布××新品：定价区间、首发渠道与保修政策；营销侧重「技术普惠」叙事。";
+      } else if (key === "product_startup") {
+        document.getElementById("wizExerciseType").value = "product";
+        document.getElementById("wizArchetype").value = "startup";
+        document.getElementById("wizBrandEquity").value = "0.36";
+        document.getElementById("wizReputation").value =
+          "早期用户口碑两极；融资轮次敏感，对外口径需克制。";
+        document.getElementById("wizSupplyChain").value =
+          "小批量试产，外包组装与单一供应商风险并存。";
+        document.getElementById("wizBrief").value =
+          "创业团队发布×× MVP：种子用户内测、公开预约与客服承载；现金跑道有限。";
+      }
+    }
+
+    function mergeRunRequestBody(base) {
+      const w = window.__wizardOverrides || {};
+      const out = { ...base, ...w };
+      const ipc = window.__pendingInternalCommit;
+      if (ipc && ipc.plain_solution && String(ipc.plain_solution).trim()) {
+        out.internal_plan_commit = ipc;
+      }
+      return out;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function parseSolutionPlans(text) {
+      const t = (text || "").trim();
+      if (!t) return [];
+      if (t.includes("\n---\n")) return t.split("\n---\n").map((x) => x.trim()).filter(Boolean);
+      return [t];
+    }
+
+    function buildResumeSubmitBody(checkpointToken, solutionText) {
+      const plans = parseSolutionPlans(solutionText);
+      const body = {
+        checkpoint_token: checkpointToken,
+        resume_stage: "submit_solutions",
+        ...apiFields(),
+      };
+      if (plans.length > 1) body.user_solutions = plans;
+      else body.user_solution = plans[0] || solutionText.trim();
+      return body;
+    }
+
+    function apiFields() {
+      return {
+        primary: document.getElementById("primary").value.trim() || null,
+        fast: document.getElementById("fast").value.trim() || null,
+        openai_api_key: document.getElementById("key").value.trim() || null,
+        openai_base_url: document.getElementById("base").value.trim() || null,
+      };
+    }
+
+    let __pepoleApiBaseResolved = null;
+
+    function pepoleApiMetaOrigin() {
+      const meta = document.querySelector('meta[name="pepole-api-origin"]');
+      const m = meta && meta.getAttribute("content");
+      if (m && String(m).trim()) return String(m).trim().replace(/\/$/, "");
+      return null;
+    }
+
+    function pepoleApiBaseGuess() {
+      const meta = pepoleApiMetaOrigin();
+      if (meta) return meta;
+      const o = window.location.origin;
+      if (o && o !== "null" && window.location.protocol !== "file:") return o;
+      return "http://127.0.0.1:8770";
+    }
+
+    function pepoleApiBaseCandidates() {
+      const out = [];
+      const meta = pepoleApiMetaOrigin();
+      if (meta) out.push(meta);
+      const o = window.location.origin;
+      if (o && o !== "null" && window.location.protocol !== "file:") out.push(o);
+      out.push("http://127.0.0.1:8770");
+      out.push("http://localhost:8770");
+      return [...new Set(out)];
+    }
+
+    /** 依次探测 GET /api/scenarios，解决「页面在静态服/file 而后端在 8770」导致的 404 Not Found */
+    async function ensurePepoleApiBase() {
+      if (__pepoleApiBaseResolved) return;
+      for (const base of pepoleApiBaseCandidates()) {
+        try {
+          const url = new URL("/api/scenarios", base + "/").href;
+          const r = await fetch(url, { method: "GET" });
+          if (!r.ok) continue;
+          const j = await r.json();
+          if (j && Array.isArray(j.scenarios)) {
+            __pepoleApiBaseResolved = base;
+            return;
+          }
+        } catch (_) {
+          /* try next */
+        }
+      }
+    }
+
+    function pepoleApiUrl(path) {
+      const p = path.startsWith("/") ? path : "/" + path;
+      const base = __pepoleApiBaseResolved || pepoleApiBaseGuess();
+      return new URL(p, base + "/").href;
+    }
+
+    function formatPepoleApi404Hint(status, msg) {
+      if (status !== 404) return typeof msg === "string" ? msg : JSON.stringify(msg);
+      const m = typeof msg === "string" ? msg : "";
+      if (m.includes("未找到场景") || m.includes("checkpoint")) return m;
+      return (
+        m +
+        "\n未连上后端：请双击运行项目里的 run_web.cmd（或执行 uvicorn），保持窗口不关；页面已默认连接本机 8770。"
+      );
+    }
+
+    function scenarioFileForApi() {
+      const v = (document.getElementById("scenario").value || "").trim();
+      if (!v || v.includes("无 yaml")) return null;
+      return v;
+    }
+
+    function initNetwork() {
+      netNodes = new vis.DataSet([]);
+      netEdges = new vis.DataSet([]);
+      window.__netEdgeAgg = new Map();
+      const container = document.getElementById("interactionGraph");
+      const opts = {
+        autoResize: true,
+        layout: { improvedLayout: true, randomSeed: 7 },
+        physics: NET_PHYSICS,
+        nodes: {
+          font: { color: "#e2e8f0", size: 12, face: "Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" },
+          borderWidth: 2,
+          shadow: { enabled: true, color: "rgba(0,0,0,0.35)", size: 10, x: 2, y: 2 },
+          margin: 8,
+        },
+        groups: {
+          cohort: {
+            shape: "box",
+            color: { background: "rgba(124,58,237,0.9)", border: "#ddd6fe" },
+            font: { color: "#faf5ff", size: 11 },
+            margin: 12,
+            borderWidth: 2,
+          },
+          regulator: {
+            shape: "dot",
+            size: 28,
+            color: { background: "#d97706", border: "#fcd34d" },
+            font: { color: "#fffbeb", size: 11, bold: true },
+          },
+          media: {
+            shape: "dot",
+            size: 26,
+            color: { background: "#0891b2", border: "#67e8f9" },
+            font: { color: "#ecfeff", size: 11 },
+          },
+          enterprise: {
+            shape: "dot",
+            size: 24,
+            color: { background: "#4d7c0f", border: "#bef264" },
+            font: { color: "#f7fee7", size: 11 },
+          },
+          actor: {
+            shape: "dot",
+            size: 22,
+            color: { background: "#2563eb", border: "#93c5fd" },
+            font: { color: "#eff6ff", size: 11 },
+          },
+        },
+        edges: {
+          arrows: { to: { enabled: true, scaleFactor: 0.65 } },
+          color: { inherit: false },
+          font: {
+            color: "#94a3b8",
+            size: 10,
+            align: "middle",
+            strokeWidth: 0,
+            background: "rgba(15,20,28,0.78)",
+          },
+          smooth: { type: "cubicBezier", roundness: 0.42, forceDirection: "none" },
+          selectionWidth: 2,
+        },
+        interaction: {
+          hover: true,
+          tooltipDelay: 60,
+          zoomView: true,
+          dragView: true,
+          multiselect: false,
+        },
+      };
+      net = new vis.Network(container, { nodes: netNodes, edges: netEdges }, opts);
+      netPhysicsUser = false;
+      net.on("stabilizationIterationsDone", () => {
+        if (!netPhysicsUser) {
+          net.setOptions({ physics: false });
+          updateNetPhysicsBtn();
+        }
+        if (!window.__netDidInitialFit) {
+          window.__netDidInitialFit = true;
+          try {
+            net.fit({ animation: { duration: 420, easingFunction: "easeInOutQuad" } });
+          } catch (_) {}
+        }
+      });
+      if (!window.__netToolbarBound) {
+        window.__netToolbarBound = true;
+        document.getElementById("netFitBtn")?.addEventListener("click", () => {
+          try {
+            net.fit({ animation: { duration: 380, easingFunction: "easeInOutQuad" } });
+          } catch (_) {}
+        });
+        document.getElementById("netStabBtn")?.addEventListener("click", () => {
+          netPhysicsUser = false;
+          updateNetPhysicsBtn();
+          net.setOptions({ physics: { ...NET_PHYSICS, enabled: true } });
+          net.stabilize(200);
+        });
+        document.getElementById("netPhysicsBtn")?.addEventListener("click", () => {
+          netPhysicsUser = !netPhysicsUser;
+          if (netPhysicsUser) {
+            net.setOptions({ physics: { ...NET_PHYSICS, enabled: true } });
+          } else {
+            net.setOptions({ physics: false });
+          }
+          updateNetPhysicsBtn();
+        });
+      }
+      updateNetPhysicsBtn();
+    }
+
+    function resetNetwork() {
+      if (!netNodes || !netEdges) initNetwork();
+      window.__netEdgeAgg = new Map();
+      window.__netDidInitialFit = false;
+      netNodes.clear();
+      netEdges.clear();
+      net.setOptions({ physics: { ...NET_PHYSICS, enabled: true } });
+      netPhysicsUser = false;
+      updateNetPhysicsBtn();
+    }
+
+    function upsertNode(id, label) {
+      if (!id) return;
+      const full = String(label || id).trim() || id;
+      const short = full.length > 18 ? full.slice(0, 17) + "…" : full;
+      const g = classifyNetworkGroup(id, full);
+      const ex = netNodes.get(id);
+      if (!ex) {
+        netNodes.add({
+          id,
+          label: short,
+          title: full,
+          group: g,
+        });
+      } else {
+        const ng = classifyNetworkGroup(id, full);
+        netNodes.update({ id, label: short, title: full, group: ng });
+      }
+    }
+
+    function addInteractionEdge(ev) {
+      const from = ev.from_id;
+      const to = ev.to_id;
+      if (!from || !to) return;
+      const fl = ev.from_label || from;
+      const tl = ev.to_label || to;
+      upsertNode(from, fl);
+      upsertNode(to, tl);
+      const kind = ev.kind || "cross_actor_coordination";
+      const { line, hi } = edgeColorForKind(kind);
+      const kAgg = from + "\x01" + to;
+      let rec = window.__netEdgeAgg.get(kAgg);
+      const ch = String(ev.channel || "交流").slice(0, 8);
+      if (!rec) {
+        const eid = "e_" + kAgg.replace(/[^\w\u4e00-\u9fff]+/g, "_").slice(0, 80);
+        rec = { id: eid, count: 0, kinds: new Set(), channels: new Set(), tips: [] };
+        window.__netEdgeAgg.set(kAgg, rec);
+        netEdges.add({
+          id: rec.id,
+          from,
+          to,
+          label: "",
+          title: "",
+          width: 1.2,
+          color: { color: line, highlight: hi, hover: hi },
+        });
+      }
+      rec.count += 1;
+      rec.kinds.add(kind);
+      if (ch) rec.channels.add(ch);
+      const sum = String(ev.summary || "").replace(/\s+/g, " ").trim().slice(0, 140);
+      if (sum) {
+        rec.tips.push("t" + (ev.tick != null ? ev.tick : "?") + ": " + sum);
+        if (rec.tips.length > 12) rec.tips.shift();
+      }
+      const w = Math.min(1.1 + rec.count * 0.55, 9);
+      const labParts = [];
+      if (rec.channels.size) labParts.push(Array.from(rec.channels).slice(0, 2).join("/"));
+      labParts.push("×" + rec.count);
+      netEdges.update({
+        id: rec.id,
+        width: w,
+        label: labParts.join(" "),
+        title: rec.tips.length ? rec.tips.join("\n——\n") : (sum || kind),
+        color: { color: line, highlight: hi, hover: hi },
+      });
+      const maxEdges = 100;
+      const ids = netEdges.getIds();
+      if (ids.length > maxEdges) {
+        const drop = ids.slice(0, ids.length - maxEdges);
+        for (const d of drop) {
+          const e = netEdges.get(d);
+          if (e) {
+            const kk = e.from + "\x01" + e.to;
+            window.__netEdgeAgg.delete(kk);
+          }
+        }
+        netEdges.remove(drop);
+      }
+      if (net && !netPhysicsUser) {
+        net.setOptions({ physics: { ...NET_PHYSICS, enabled: true } });
+        try {
+          net.stabilize(50);
+        } catch (_) {}
+      }
+    }
+
+    function renderRiskBoard(metrics) {
+      const m = metrics || {};
+      const risks = [];
+      const push = (lvl, text) => risks.push(`<div class="${lvl}">- ${escapeHtml(text)}</div>`);
+      if (m.rumor_level != null) {
+        if (m.rumor_level >= 0.28) push("risk-bad", `谣言热度高（${m.rumor_level.toFixed(3)}）`);
+        else if (m.rumor_level >= 0.18) push("risk-warn", `谣言升温（${m.rumor_level.toFixed(3)}）`);
+      }
+      if (m.unrest != null) {
+        if (m.unrest >= 0.25) push("risk-bad", `争议/动荡压力高（${m.unrest.toFixed(3)}）`);
+        else if (m.unrest >= 0.16) push("risk-warn", `争议压力偏高（${m.unrest.toFixed(3)}）`);
+      }
+      if (m.policy_support != null && m.policy_support <= 0.40) push("risk-warn", `支持度偏弱（${m.policy_support.toFixed(3)}）`);
+      if (m.cash_balance_million != null && m.cash_balance_million <= 120) push("risk-bad", `账面现金紧张（${m.cash_balance_million.toFixed(1)} 百万）`);
+      if (m.fiscal_remaining_billion != null && m.fiscal_remaining_billion <= 1.0) push("risk-bad", `可用财力偏紧（${m.fiscal_remaining_billion.toFixed(3)} 十亿）`);
+      if (m.debt_balance_million != null && m.debt_balance_million >= 80) push("risk-warn", `债务本金余额较高（${m.debt_balance_million.toFixed(1)} 百万）`);
+      document.getElementById("riskBoard").innerHTML = risks.length ? risks.join("") : "当前未见明显红线风险。";
+    }
+
+    function updateFinanceSnapshot(metrics) {
+      const box = document.getElementById("financeSnapshot");
+      const fe = !!window.__financeEnabled;
+      const ex = window.__exerciseType || "";
+      const m = metrics || {};
+      const isProduct = ex === "product";
+      if (!fe) {
+        box.innerHTML =
+          '<span class="fs-muted">本场景未启用 <code>operational_finance</code>：页面上不推演账面 / 财力。请在 YAML 设 <code>operational_finance.enabled: true</code>（产品盘默认有<strong>账面现金</strong>；政策盘常配 <code>fiscal_pool_billion</code> 显示<strong>财力池</strong>）。</span>';
+        return;
+      }
+      const c = m.cash_balance_million;
+      const f = m.fiscal_remaining_billion;
+      const d = m.debt_balance_million;
+      const parts = [];
+      const cashVal =
+        c != null && c !== undefined
+          ? '<span class="val">' + Number(c).toFixed(2) + "</span> <span class=\"fs-muted\">百万 proxy</span>"
+          : '<span class="val">—</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
+      const debtVal =
+        d != null && d !== undefined
+          ? '<span class="val">' + Number(d).toFixed(2) + "</span> <span class=\"fs-muted\">百万 proxy（有息负债本金余额）</span>"
+          : '<span class="val">—</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
+      if ((c != null && c !== undefined) || (isProduct && fe)) {
+        parts.push('<div class="fs-item"><strong>账面现金</strong> ' + cashVal + "</div>");
+      }
+      if (f != null && f !== undefined)
+        parts.push(
+          '<div class="fs-item"><strong>可用财力池</strong><span class="val">' +
+            Number(f).toFixed(3) +
+            '</span> <span class="fs-muted">十亿 proxy</span></div>',
+        );
+      if ((d != null && d !== undefined) || (isProduct && fe)) {
+        parts.push('<div class="fs-item"><strong>债务本金</strong> ' + debtVal + "</div>");
+      }
+      if (!parts.length) {
+        const hintPolicy =
+          "财务已启用：当前尚无读数。<strong>政策演练</strong>仅财力时，请在 YAML 填写 <code>operational_finance.fiscal_pool_billion</code>（未填则引擎不写财力字段）。";
+        const hintGeneric =
+          "财务已启用：等待首轮 tick 结束即有读数。若始终为空，请检查场景类型与 <code>operational_finance</code> 字段。";
+        box.innerHTML =
+          '<div class="fs-muted">' + (ex === "policy" ? hintPolicy : hintGeneric) + "</div>";
+        return;
+      }
+      box.innerHTML =
+        '<div class="fs-row">' +
+        parts.join("") +
+        '</div><div class="fs-muted" style="margin-top:0.35rem;">数额为演练用 proxy：以 YAML <code>operational_finance</code> 为准可贴近真实体量；未写且仍为模板默认时，引擎会按 issuer 档位写意初值。合作报价等叙事与此账面自洽。暂停时可「财务手工调账」。勾选 checkpoint 的「仅评估」会带入当时账面。</div>';
+    }
+
+    function renderFinanceChart(history) {
+      const row = document.getElementById("chartFinanceRow");
+      const canvas = document.getElementById("chartFinance");
+      if (!history || !history.length) {
+        row.style.display = "none";
+        if (chartFinance) {
+          chartFinance.destroy();
+          chartFinance = null;
+        }
+        return;
+      }
+      const finKeys = ["cash_balance_million", "fiscal_remaining_billion", "debt_balance_million"];
+      const keys = finKeys.filter((k) => history.some((h) => h[k] != null && h[k] !== undefined));
+      if (!keys.length) {
+        row.style.display = "none";
+        if (chartFinance) {
+          chartFinance.destroy();
+          chartFinance = null;
+        }
+        return;
+      }
+      row.style.display = "block";
+      const labels = history.map((_, i) => "t" + (i + 1));
+      const colors = ["#94e2d5", "#fca5a5", "#fcd34d"];
+      const labelMap = {
+        cash_balance_million: "账面现金（百万 proxy）",
+        fiscal_remaining_billion: "财力池（十亿）",
+        debt_balance_million: "债务本金（百万 proxy）",
+      };
+      if (chartFinance) chartFinance.destroy();
+      chartFinance = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: keys.map((k, i) => ({
+            label: labelMap[k] || k,
+            data: history.map((h) => h[k] ?? null),
+            borderColor: colors[i % colors.length],
+            tension: 0.2,
+            fill: false,
+            pointRadius: 2,
+            borderWidth: 2,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.2,
+          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          scales: {
+            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
+            y: { ticks: { color: "#94e2d5" }, grid: { color: "#2a3544" } },
+          },
+        },
+      });
+    }
+
+    function formatPlanEvaluateView(j) {
+      if (!j || j.ok === false) return JSON.stringify(j, null, 2);
+      const lines = [];
+      lines.push("══ 专业转化（digest）══");
+      const d = j.digest || {};
+      if (d.understood_intent) lines.push("意图：" + d.understood_intent);
+      if (d.intent_bullets && d.intent_bullets.length)
+        lines.push("要点：\n" + d.intent_bullets.map((x) => "  · " + x).join("\n"));
+      if (d.professional_execution_plan) lines.push("执行层表述：\n" + d.professional_execution_plan);
+      if (d.feasibility)
+        lines.push("可执行性：" + d.feasibility + (d.feasibility_notes ? " — " + d.feasibility_notes : ""));
+      if (d.involved_functions && d.involved_functions.length) lines.push("涉及职能：" + d.involved_functions.join("、"));
+      if (d.estimated_timeline_cn) lines.push("阶段周期：" + d.estimated_timeline_cn);
+      if (d.policy_equivalent_steps) lines.push("政策流程映射：" + d.policy_equivalent_steps);
+      lines.push("");
+      lines.push("══ 内部桌面研判（desk）· 资源粗估 ══");
+      const dk = j.desk || {};
+      if (dk.desk_verdict_cn || dk.desk_verdict) lines.push("结论：" + (dk.desk_verdict_cn || dk.desk_verdict));
+      if (dk.resource_cash_band_cn) lines.push("资金/费用量级：" + dk.resource_cash_band_cn);
+      if (dk.resource_manpower_band_cn) lines.push("人力/组织量级：" + dk.resource_manpower_band_cn);
+      if (dk.resource_other_cn) lines.push("其他资源：" + dk.resource_other_cn);
+      if (dk.internal_gaps && dk.internal_gaps.length) lines.push("内部缺口：" + dk.internal_gaps.join("；"));
+      if (dk.recommended_internal_next_steps && dk.recommended_internal_next_steps.length)
+        lines.push("建议下一步：" + dk.recommended_internal_next_steps.join("；"));
+      if (dk.why_not_feasible && dk.why_not_feasible.length) lines.push("卡点：" + dk.why_not_feasible.join("；"));
+      if (dk.estimated_timeline_desk_cn) lines.push("内部里程碑：" + dk.estimated_timeline_desk_cn);
+      if (dk.caveat) lines.push("提示：" + dk.caveat);
+      if (j.tick_context != null) lines.push("\n（评估所用上下文 tick=" + j.tick_context + "）");
+      lines.push("\n──── 原始 JSON（可复制）────\n" + JSON.stringify(j, null, 2));
+      return lines.join("\n");
+    }
+
+    function refreshDraftPlanCandidateSelect() {
+      const sel = document.getElementById("draftPlanCandidateSelect");
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— 选一套载入 —</option>';
+      (window.__draftPlanCandidates || []).forEach((c, i) => {
+        const o = document.createElement("option");
+        o.value = String(i);
+        o.textContent = c.label || "草案 " + (i + 1);
+        sel.appendChild(o);
+      });
+    }
+
+    function updateEvalCommitmentHintFromPayload(j) {
+      const el = document.getElementById("evalCommitmentHint");
+      if (!el) return;
+      const d = (j && j.digest) || {};
+      const k = (j && j.desk) || {};
+      const parts = [];
+      if (d.estimated_timeline_cn)
+        parts.push("转化侧周期（估计）：" + String(d.estimated_timeline_cn).slice(0, 240));
+      if (k.estimated_timeline_desk_cn)
+        parts.push("桌面里程碑（估计）：" + String(k.estimated_timeline_desk_cn).slice(0, 240));
+      parts.push(
+        "点「确认执行」后：写入<strong>决策层指令</strong>与<strong>公司记忆</strong>，各智能体后续 tick 可引用；并对<strong>账面/宏观</strong>做一轮沙盘边际调整。",
+      );
+      parts.push("引擎会登记<strong>未来某一 tick</strong>的「约定检视」节点，到点在叙事与流式日志中输出。");
+      el.innerHTML = parts.join("<br/>");
+    }
+
+    async function loadScenarios() {
+      let j = null;
+      if (__pepoleApiBaseResolved) {
+        const r = await fetch(pepoleApiUrl("/api/scenarios"));
+        if (!r.ok) {
+          const t = await r.text();
+          let detail = t.slice(0, 200);
+          try {
+            const je = JSON.parse(t);
+            if (je.detail) detail = typeof je.detail === "string" ? je.detail : JSON.stringify(je.detail);
+          } catch (_) {}
+          throw new Error(formatPepoleApi404Hint(r.status, detail));
+        }
+        j = await r.json();
+      } else {
+        for (const base of pepoleApiBaseCandidates()) {
+          try {
+            const url = new URL("/api/scenarios", base + "/").href;
+            const r = await fetch(url, { method: "GET" });
+            if (!r.ok) continue;
+            const jj = await r.json();
+            if (jj && Array.isArray(jj.scenarios)) {
+              __pepoleApiBaseResolved = base;
+              j = jj;
+              break;
+            }
+          } catch (_) {
+            /* next candidate */
+          }
+        }
+        if (!j) {
+          throw new Error(formatPepoleApi404Hint(404, "Not Found"));
+        }
+      }
+      const sel = document.getElementById("scenario");
+      sel.innerHTML = "";
+      (j.scenarios || []).forEach((name) => {
+        const o = document.createElement("option");
+        o.value = name;
+        o.textContent = name;
+        sel.appendChild(o);
+      });
+      if (!sel.options.length) sel.innerHTML = "<option>（无 yaml）</option>";
+      syncWizardScenarioOptions();
+    }
+
+    function updateDecisionLayerPanel(summaryText) {
+      const act = document.getElementById("decisionLayerActive");
+      const ph = document.getElementById("decisionLayerActivePlaceholder");
+      const t = (summaryText || "").trim();
+      if (t) {
+        act.style.display = "block";
+        ph.style.display = "none";
+        act.innerHTML =
+          "<strong>当前决策层（已注入后续 tick 上下文）</strong>" +
+          '<div style="margin-top:0.35rem;white-space:pre-wrap;font-size:0.85rem;">' +
+          escapeHtml(t) +
+          "</div>";
+      } else {
+        act.style.display = "none";
+        ph.style.display = "block";
+      }
+    }
+
+    function fillHistorySelect(history) {
+      const sel = document.getElementById("historyPlanPick");
+      if (!sel) return;
+      sel.innerHTML = '<option value="">— 载入历史 —</option>';
+      window.__decisionHistory = history || [];
+      window.__decisionHistory.forEach((h, i) => {
+        const o = document.createElement("option");
+        o.value = String(i);
+        const st = h.status || "条目";
+        const raw = (h.plain_excerpt || h.plain_full || "").replace(/\s+/g, " ").trim();
+        const ex = raw.slice(0, 40);
+        o.textContent = `[${st}] ${ex}${raw.length > 40 ? "…" : ""}`;
+        sel.appendChild(o);
+      });
+    }
+
+    function renderPlanEvalStrip(pe) {
+      if (!pe || !pe.length)
+        return '<p class="hint" style="margin:0">（无研判明细）</p>';
+      return pe
+        .map((p, i) => {
+          const fe = p.feasibility
+            ? `<div><strong>可执行性（转化）</strong>：${escapeHtml(String(p.feasibility))}</div>`
+            : "";
+          const et = p.estimated_timeline_cn
+            ? `<div><strong>阶段周期 · 转化估计</strong>：${escapeHtml(String(p.estimated_timeline_cn))}</div>`
+            : "";
+          const etd = p.estimated_timeline_desk_cn
+            ? `<div><strong>阶段周期 · 桌面估计</strong>：${escapeHtml(String(p.estimated_timeline_desk_cn))}</div>`
+            : "";
+          const dv = p.desk_verdict_cn
+            ? `<div><strong>桌面结论</strong>：${escapeHtml(String(p.desk_verdict_cn))}</div>`
+            : "";
+          return `<div class="pe-plan"><strong>方案 ${i + 1}</strong>${fe}${et}${etd}${dv}</div>`;
+        })
+        .join("");
+    }
+
+    function releaseStreamLocks() {
+      document.getElementById("runBtn").disabled = false;
+      document.getElementById("crisisSubmit").disabled = false;
+      document.getElementById("confirmProceedBtn").disabled = false;
+      document.getElementById("inlineResumeBtn").disabled = false;
+      const ens = document.getElementById("ensembleBtn");
+      if (ens) ens.disabled = false;
+      const r1 = document.getElementById("reevalDeskBtn");
+      const r2 = document.getElementById("modifyDeskBtn");
+      if (r1) r1.disabled = false;
+      if (r2) r2.disabled = false;
+    }
+
+    function setRunning(on, subline) {
+      const btn = document.getElementById("runBtn");
+      btn.disabled = on;
+      document.getElementById("crisisSubmit").disabled = on;
+      document.getElementById("confirmProceedBtn").disabled = on;
+      document.getElementById("inlineResumeBtn").disabled = on;
+      /* 仅评估走独立 HTTP，不与流式 run 互斥，运行中也可点击 */
+      const ens = document.getElementById("ensembleBtn");
+      if (ens) ens.disabled = on;
+      const r1 = document.getElementById("reevalDeskBtn");
+      const r2 = document.getElementById("modifyDeskBtn");
+      if (r1) r1.disabled = on;
+      if (r2) r2.disabled = on;
+      const stopBtn = document.getElementById("stopStreamBtn");
+      if (stopBtn) {
+        stopBtn.style.display = on ? "inline-block" : "none";
+        stopBtn.disabled = !on;
+      }
+      const live = document.getElementById("liveDetail");
+      if (!on) {
+        document.getElementById("status").textContent = "就绪";
+        live.textContent = "";
+        return;
+      }
+      document.getElementById("status").innerHTML =
+        '<span class="spinner"></span>运行中，请等待（勿关页面）…';
+      live.textContent = subline || "";
+    }
+
+    function appendLiveLog(line) {
+      const el = document.getElementById("liveLog");
+      el.style.display = "block";
+      el.textContent += (el.textContent ? "\n" : "") + line;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function renderHorizon(h) {
+      const el = document.getElementById("horizonPanel");
+      if (!h || typeof h !== "object") {
+        el.innerHTML = '<p class="hint" style="margin:0;">（本 tick 无展望数据）</p>';
+        return;
+      }
+      const rows = [
+        ["今天～本周", h.today],
+        ["约一个月后", h.next_month],
+        ["约一年后", h.next_year],
+        ["约两年后", h.two_years],
+        ["约三年后", h.three_years],
+      ].filter(([, v]) => v && String(v).trim());
+      el.innerHTML = rows.length
+        ? rows.map(([k, v]) => `<div class="hz"><strong>${escapeHtml(k)}</strong><p>${escapeHtml(String(v))}</p></div>`).join("")
+        : '<p class="hint" style="margin:0;">（展望字段为空）</p>';
+    }
+
+    function appendDetailEvents(events) {
+      if (!events || !events.length) return;
+      const panel = document.getElementById("detailPanel");
+      const hint = panel.querySelector(".hint-only");
+      if (hint) hint.remove();
+      for (const e of events) {
+        const kind = e.kind || "";
+        const unfav = kind === "media_unfavorable";
+        const tick = e.tick != null ? `t${e.tick}` : "—";
+        const title = escapeHtml(e.title || kind || "细节");
+        const body = escapeHtml(e.body || "");
+        const div = document.createElement("div");
+        div.className = "detail-item" + (unfav ? " unfav" : "");
+        div.innerHTML = `<div class="dt">${tick} · ${kind}</div><strong>${title}</strong><div>${body}</div>`;
+        panel.appendChild(div);
+      }
+      panel.scrollTop = panel.scrollHeight;
+    }
+
+    function applyCompletePayload(data) {
+      const h = data.header || {};
+      document.getElementById("headerInfo").innerHTML = [
+        ["场景", h.name],
+        ["类型", h.exercise_type],
+        ["ticks", h.ticks],
+        ["seed", h.seed],
+        ["行政层级", h.admin_level],
+        ["地名", h.jurisdiction_name || "—"],
+        ["发行方类型", h.issuer_archetype],
+        ["brand_equity", h.brand_equity],
+      ]
+        .map(([k, v]) => `<span class="pill">${k}: ${v}</span>`)
+        .join(" ");
+      const fm = data.final_metrics || {};
+      document.getElementById("finalMetrics").innerHTML = Object.entries(fm)
+        .map(([k, v]) => `<span class="pill">${k}: ${typeof v === "number" ? v.toFixed(4) : v}</span>`)
+        .join(" ");
+      document.getElementById("narrative").textContent = (data.narrative || []).join("\n");
+      updateDecisionLayerPanel(data.decision_layer_active_summary || "");
+      fillHistorySelect(data.decision_layer_history || []);
+      if (data.metrics_history && data.metrics_history.length) {
+        renderChart(data.metrics_history);
+        renderExtensionChart(data.metrics_history);
+        renderFinanceChart(data.metrics_history);
+      }
+      if (data.metrics_history && data.metrics_history.length) renderRiskBoard(data.metrics_history[data.metrics_history.length - 1]);
+      updateFinanceSnapshot(data.final_metrics || {});
+      renderHorizon(data.horizon_forecast || {});
+      if (data.detail_events && data.detail_events.length) {
+        document.getElementById("detailPanel").innerHTML = "";
+        appendDetailEvents(data.detail_events);
+      }
+      const sec = data.elapsed_seconds != null ? `（用时 ${data.elapsed_seconds}s）` : "";
+      document.getElementById("status").innerHTML =
+        '<span style="color:var(--ok)">完成</span>' + sec;
+    }
+
+    function renderChart(history) {
+      if (!history || !history.length) return;
+      const ctx = document.getElementById("chart").getContext("2d");
+      const labels = history.map((_, i) => "t" + (i + 1));
+      const baseKeys = [
+        "policy_support",
+        "unrest",
+        "issuer_trust_proxy",
+        "supply_chain_stress",
+        "sentiment",
+        "rumor_level",
+        "economy_index",
+      ];
+      const keys = baseKeys.filter((k) => history.some((h) => h[k] != null && h[k] !== undefined));
+      if (!keys.length) keys.push("policy_support");
+      const colors = ["#3d8bfd", "#f7768e", "#9ece6a", "#e0af68", "#bb9af7", "#7aa2f7", "#ff9e64", "#94e2d5", "#fca5a5"];
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: keys.map((k, i) => ({
+            label: k,
+            data: history.map((h) => h[k] ?? null),
+            borderColor: colors[i % colors.length],
+            tension: 0.22,
+            fill: false,
+            pointRadius: 2,
+            borderWidth: 2,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.2,
+          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          scales: {
+            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
+            y: {
+              ticks: { color: "#8b9cb3" },
+              grid: { color: "#2a3544" },
+              suggestedMin: -0.08,
+              suggestedMax: 1.05,
+            },
+          },
+        },
+      });
+    }
+
+    function renderExtensionChart(history) {
+      if (!history || !history.length) return;
+      const extKeys = new Set();
+      for (const row of history) {
+        Object.keys(row).forEach((k) => {
+          if (k.startsWith("kpi_") || k === "diffusion_i_share") extKeys.add(k);
+          if (k === "resource_manpower" || k === "resource_political_capital") extKeys.add(k);
+        });
+      }
+      const keys = Array.from(extKeys);
+      const ctx = document.getElementById("chartExt");
+      if (!keys.length) {
+        if (chartExt) {
+          chartExt.destroy();
+          chartExt = null;
+        }
+        return;
+      }
+      const labels = history.map((_, i) => "t" + (i + 1));
+      const resIdx = [];
+      const normKeys = keys.filter((k) => {
+        if (k === "resource_manpower" || k === "resource_political_capital") {
+          resIdx.push(k);
+          return false;
+        }
+        return true;
+      });
+      const palette = ["#c084fc", "#38bdf8", "#4ade80", "#fb923c", "#f472b6", "#a78bfa", "#2dd4bf"];
+      const datasets = [];
+      let pi = 0;
+      for (const k of normKeys) {
+        datasets.push({
+          label: k,
+          data: history.map((h) => h[k] ?? null),
+          borderColor: palette[pi % palette.length],
+          tension: 0.2,
+          fill: false,
+          pointRadius: 2,
+          yAxisID: "y",
+          borderWidth: 2,
+        });
+        pi++;
+      }
+      for (const k of resIdx) {
+        datasets.push({
+          label: k,
+          data: history.map((h) => h[k] ?? null),
+          borderColor: "#fcd34d",
+          tension: 0.2,
+          fill: false,
+          pointRadius: 2,
+          yAxisID: "y1",
+          borderDash: [4, 3],
+          borderWidth: 2,
+        });
+      }
+      if (chartExt) chartExt.destroy();
+      chartExt = new Chart(ctx.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.2,
+          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          scales: {
+            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
+            y: {
+              id: "y",
+              position: "left",
+              ticks: { color: "#a78bfa" },
+              grid: { color: "#2a3544" },
+              suggestedMin: -1.05,
+              suggestedMax: 1.05,
+            },
+            y1: {
+              id: "y1",
+              position: "right",
+              display: resIdx.length > 0,
+              ticks: { color: "#fcd34d" },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      });
+    }
+
+    function renderEnsembleChart(summary) {
+      const dist = summary && summary.distributions;
+      const canvas = document.getElementById("ensembleChart");
+      if (!canvas || !dist) return;
+      const keys = Object.keys(dist).filter((k) => dist[k] && dist[k].n >= 1).slice(0, 10);
+      if (!keys.length) {
+        if (ensembleChart) {
+          ensembleChart.destroy();
+          ensembleChart = null;
+        }
+        return;
+      }
+      if (ensembleChart) ensembleChart.destroy();
+      ensembleChart = new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: keys,
+          datasets: [
+            {
+              label: "p10",
+              data: keys.map((k) => dist[k].p10),
+              backgroundColor: "rgba(61,139,253,0.45)",
+              borderColor: "#3d8bfd",
+              borderWidth: 1,
+            },
+            {
+              label: "p50",
+              data: keys.map((k) => dist[k].p50),
+              backgroundColor: "rgba(158,206,106,0.55)",
+              borderColor: "#9ece6a",
+              borderWidth: 1,
+            },
+            {
+              label: "p90",
+              data: keys.map((k) => dist[k].p90),
+              backgroundColor: "rgba(247,118,142,0.45)",
+              borderColor: "#f7768e",
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.4,
+          plugins: { legend: { labels: { color: "#c0c8d4" } } },
+          scales: {
+            x: { ticks: { color: "#8b9cb3", maxRotation: 45, minRotation: 25 } },
+            y: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" }, beginAtZero: false },
+          },
+        },
+      });
+    }
+
+    async function readSseStream(res, handlers) {
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let streamDone = false;
+      try {
+        while (!streamDone) {
+          let chunk;
+          try {
+            chunk = await reader.read();
+          } catch (readErr) {
+            if (readErr && readErr.name === "AbortError") throw readErr;
+            throw readErr;
+          }
+          const { done, value } = chunk;
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let sep;
+          while ((sep = buf.indexOf("\n\n")) >= 0) {
+            const block = buf.slice(0, sep);
+            buf = buf.slice(sep + 2);
+            for (const raw of block.split("\n")) {
+              const line = raw.replace(/\r$/, "");
+              if (!line.startsWith("data: ")) continue;
+              let ev;
+              try {
+                ev = JSON.parse(line.slice(6));
+              } catch (_) {
+                appendLiveLog("[解析失败] " + line.slice(0, 120));
+                continue;
+              }
+              const r = handlers.onEvent(ev);
+              if (r === "stop") {
+                streamDone = true;
+                break;
+              }
+            }
+            if (streamDone) break;
+          }
+        }
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch (_) {}
+      }
+    }
+
+    function handleStreamEvent(ev) {
+      const ph = ev.phase;
+      if (ph === "run_start") {
+        window.__pendingInternalCommit = null;
+        window.__metricsHistory = [];
+        const fi = ev.finance_enabled ? " · 财务细节开" : "";
+        const inst = ev.institution_count != null ? ` · 机构 ${ev.institution_count}` : "";
+        const cr = ev.crisis_rule_count != null ? ` · 危机规则 ${ev.crisis_rule_count}` : "";
+        const coop = ev.cooperation_count != null ? ` · 合作项 ${ev.cooperation_count}` : "";
+        const ms = ev.risk_milestone_primary_calls;
+        const rm =
+          ms != null && ms > 0 ? ` · 关键推演 ${ms} 次后内部风险盘点暂停` : "";
+        const ps =
+          ev.problem_salience != null ? ` · 议题刚需 proxy ${Number(ev.problem_salience).toFixed(2)}` : "";
+        const gate =
+          ev.confirm_after_desk_feasibility === false ? " · 研判后自动继续 tick" : " · 研判后需确认再继续";
+        document.getElementById("liveDetail").textContent =
+          `场景「${ev.scenario_name}」· ${ev.exercise_type} · 共 ${ev.total_ticks} tick · cohort_llm ${ev.cohort_llm ? "开" : "关"}${fi}${inst}${coop}${cr}${rm}${ps}${gate}`;
+        window.__financeEnabled = !!ev.finance_enabled;
+        window.__exerciseType = ev.exercise_type || "";
+        updateFinanceSnapshot({});
+      } else if (ph === "resume_start") {
+        document.getElementById("liveDetail").textContent =
+          `续跑：已完成 ${ev.tick_completed} tick，剩余约 ${ev.remaining_ticks} tick`;
+        if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
+        if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
+      } else if (ph === "resolution_digest") {
+        document.getElementById("liveDetail").textContent =
+          "白话处置 → 执行层/政策条线专业转化中…";
+        const pfx = ev.plan_index != null ? `方案${Number(ev.plan_index) + 1} · ` : "";
+        appendLiveLog(`${pfx}◎ 意图理解：${String(ev.understood_intent || "").slice(0, 200)}`);
+        appendLiveLog(`◎ 可执行性：${ev.feasibility || ""}`);
+        if (ev.professional_preview)
+          appendLiveLog(`◎ 专业方案节选：${String(ev.professional_preview).slice(0, 240)}`);
+        if (ev.policy_flow_preview)
+          appendLiveLog(`◎ 政策流程映射：${String(ev.policy_flow_preview).slice(0, 240)}`);
+        if (ev.involved_functions && ev.involved_functions.length)
+          appendLiveLog(`◎ 涉及职能：${ev.involved_functions.join("、")}`);
+        if (ev.estimated_timeline_cn)
+          appendLiveLog(`◎ 阶段周期（转化估计）：${String(ev.estimated_timeline_cn).slice(0, 260)}`);
+      } else if (ph === "internal_feasibility_digest") {
+        document.getElementById("liveDetail").textContent =
+          "公司内部桌面可行性（desk 推演，非社会实态）";
+        const pfx = ev.plan_index != null ? `方案${Number(ev.plan_index) + 1} · ` : "";
+        appendLiveLog(
+          `${pfx}◎ 桌面结论：${String(ev.desk_verdict_cn || ev.desk_verdict || "").slice(0, 260)}`,
+        );
+        if (ev.why_not_feasible && ev.why_not_feasible.length)
+          appendLiveLog(
+            `${pfx}◎ 不可行/存疑点：${ev.why_not_feasible.slice(0, 6).join("；")}`,
+          );
+        if (ev.social_linkage)
+          appendLiveLog(`◎ 与社会侧关联（假设）：${String(ev.social_linkage).slice(0, 220)}`);
+        if (ev.caveat) appendLiveLog(`◎ ${String(ev.caveat).slice(0, 240)}`);
+        if (ev.estimated_timeline_desk_cn)
+          appendLiveLog(
+            `◎ 阶段周期（桌面估计）：${String(ev.estimated_timeline_desk_cn).slice(0, 260)}`,
+          );
+      } else if (ph === "tick_begin") {
+        const tr = ev.triggers_fired && ev.triggers_fired.length ? " · 触发: " + ev.triggers_fired.join(", ") : "";
+        document.getElementById("liveDetail").textContent =
+          `第 ${ev.tick}/${ev.total_ticks} tick · ${ev.agent_count} 个 LLM 智能体${tr}`;
+        if (ev.internal_plan_milestones && ev.internal_plan_milestones.length) {
+          ev.internal_plan_milestones.forEach((line) =>
+            appendLiveLog("⏱ 内部草案·约定节点：" + String(line).slice(0, 420)),
+          );
+        }
+      } else if (ph === "agent_llm_start") {
+        document.getElementById("liveDetail").textContent =
+          `调用 LLM (${ev.index}/${ev.total_in_tick}) · ${ev.agent_id} · ${ev.role || ""}`;
+      } else if (ph === "agent_llm_done") {
+        const who = ev.agent_label || ev.agent_id;
+        const prev = ev.statement_preview
+          ? ev.statement_preview.replace(/\s+/g, " ").slice(0, 160)
+          : "（无公开陈述）";
+        appendLiveLog(`t${ev.tick} · ${who}: ${prev}`);
+        if (ev.headline_fragment && String(ev.headline_fragment).trim()) {
+          const sl = ev.media_slant || "?";
+          appendLiveLog(`  └ 报道 ${sl}: ${String(ev.headline_fragment).slice(0, 120)}`);
+        }
+      } else if (ph === "interaction_event") {
+        const from = ev.from_label || ev.from_id || "unknown";
+        const to = ev.to_label || ev.to_id || "unknown";
+        const ch = ev.channel || "工作群";
+        appendLiveLog(`↔ 交流 ${from} -> ${to} [${ch}] ${String(ev.summary || "").slice(0, 160)}`);
+        addInteractionEdge(ev);
+        const extra = [];
+        if (ev.cost_million != null) extra.push(`cost=${Number(ev.cost_million).toFixed(2)}m`);
+        if (ev.fiscal_billion != null) extra.push(`fiscal=${Number(ev.fiscal_billion).toFixed(3)}b`);
+        if (extra.length) appendLiveLog(`  └ 预算动作: ${extra.join(" · ")}`);
+      } else if (ph === "cohort_batch_start") {
+        document.getElementById("liveDetail").textContent = `第 ${ev.tick} tick · 群体 cohort 批处理 LLM…`;
+      } else if (ph === "cohort_batch_done") {
+        document.getElementById("liveDetail").textContent = `第 ${ev.tick} tick · cohort 批处理完成`;
+      } else if (ph === "tick_end") {
+        const m = ev.metrics || {};
+        const bits = ["policy_support", "unrest", "sentiment", "cash_balance_million", "fiscal_remaining_billion"]
+          .filter((k) => m[k] != null)
+          .map((k) => `${k}=${Number(m[k]).toFixed(3)}`);
+        appendLiveLog(`— tick ${ev.tick} 结束 · ${bits.join(" · ")}`);
+        if (ev.primary_llm_calls_total != null)
+          appendLiveLog(`— 累计关键智能体 LLM ${ev.primary_llm_calls_total} 次`);
+        if (ev.attribution_tick && ev.attribution_tick.length) {
+          appendLiveLog(`— 本 tick 溯源 ${ev.attribution_tick.length} 条（层/组件→Δ指标）`);
+          ev.attribution_tick.slice(-12).forEach((a) => {
+            const d = a.deltas && Object.keys(a.deltas).length ? JSON.stringify(a.deltas) : JSON.stringify(a.meta || {});
+            appendLiveLog(`   · [${a.layer}/${a.component}] ${d.slice(0, 160)}`);
+          });
+        }
+        renderRiskBoard(m);
+        if (ev.horizon) renderHorizon(ev.horizon);
+        appendDetailEvents(ev.detail_events_tick || []);
+        if (ev.metrics && typeof ev.metrics === "object") {
+          window.__metricsHistory.push({ ...ev.metrics });
+          renderChart(window.__metricsHistory);
+          renderExtensionChart(window.__metricsHistory);
+          renderFinanceChart(window.__metricsHistory);
+          updateFinanceSnapshot(ev.metrics);
+        }
+      } else if (ph === "complete") {
+        if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
+        if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
+        applyCompletePayload(ev);
+        return "stop";
+      } else if (ph === "crisis_pause") {
+        if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
+        if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
+        window.__pepoleCheckpoint = ev.checkpoint_token;
+        window.__pepolePauseKind = ev.pause_kind || "crisis_rule";
+        window.__planEvaluations = ev.plan_evaluations || [];
+        document.getElementById("crisisTitle").textContent = ev.title || "需指挥台处置";
+        document.getElementById("crisisDetail").textContent = ev.detail || "";
+        updateDecisionLayerPanel(ev.decision_layer_active_summary || "");
+        fillHistorySelect(ev.decision_layer_history || []);
+        const strip = document.getElementById("planEvalStrip");
+        const deskBar = document.getElementById("deskReviewBar");
+        const subBar = document.getElementById("crisisSubmitBar");
+        const lbl = document.getElementById("crisisSolutionLabel");
+        const ta = document.getElementById("crisisSolution");
+        const cbtn = document.getElementById("confirmProceedBtn");
+        const sbtn = document.getElementById("crisisSubmit");
+        const planPick = document.getElementById("planPick");
+        const planPickLabel = document.getElementById("planPickLabel");
+        const multiHint = document.getElementById("crisisMultiHint");
+        const reevalB = document.getElementById("reevalDeskBtn");
+        const modB = document.getElementById("modifyDeskBtn");
+        if (window.__pepolePauseKind === "desk_review") {
+          lbl.textContent = "如需改评：点「评估另一套」或「修改并重评」，编辑后提交；载入历史方案可用右上角下拉框。";
+          strip.style.display = "block";
+          strip.innerHTML = renderPlanEvalStrip(window.__planEvaluations);
+          deskBar.style.display = "flex";
+          cbtn.style.display = "inline-block";
+          if (reevalB) reevalB.style.display = "inline-block";
+          if (modB) modB.style.display = "inline-block";
+          subBar.style.display = "none";
+          sbtn.textContent = "提交重新研判";
+          ta.style.display = "none";
+          lbl.style.display = "none";
+          multiHint.style.display = "none";
+          const pe = ev.plan_evaluations;
+          if (pe && pe.length > 1) {
+            planPick.style.display = "block";
+            planPickLabel.style.display = "block";
+            planPick.innerHTML =
+              '<option value="">不指定主方案</option>' +
+              pe.map((_, i) => `<option value="${i}">方案 ${i + 1}</option>`).join("");
+          } else {
+            planPick.style.display = "none";
+            planPickLabel.style.display = "none";
+            planPick.innerHTML = "";
+          }
+        } else {
+          strip.style.display = "none";
+          strip.innerHTML = "";
+          deskBar.style.display = "none";
+          cbtn.style.display = "none";
+          if (reevalB) reevalB.style.display = "none";
+          if (modB) modB.style.display = "none";
+          subBar.style.display = "flex";
+          sbtn.textContent = "提交方案并研判";
+          ta.style.display = "block";
+          lbl.style.display = "block";
+          multiHint.style.display = "block";
+          planPick.style.display = "none";
+          planPickLabel.style.display = "none";
+          planPick.innerHTML = "";
+          if (window.__pepolePauseKind === "risk_milestone") {
+            lbl.textContent =
+              "应对方案（多套请用 --- 分行；续跑：专业转化 + 桌面可行性；默认需再确认才继续 tick）";
+          } else {
+            lbl.textContent =
+              "处置方案（多套请用 --- 分行；续跑含专业转化与桌面可行性；默认需再确认才继续 tick）";
+          }
+        }
+        document.getElementById("crisisSolution").value = "";
+        if (ev.metrics_history && ev.metrics_history.length) {
+          renderChart(ev.metrics_history);
+          renderExtensionChart(ev.metrics_history);
+          renderFinanceChart(ev.metrics_history);
+          const lm = ev.metrics_history[ev.metrics_history.length - 1];
+          updateFinanceSnapshot(lm || {});
+        } else {
+          updateFinanceSnapshot({});
+        }
+        if (ev.header) {
+          const h = ev.header;
+          document.getElementById("headerInfo").innerHTML = [
+            ["场景", h.name],
+            ["类型", h.exercise_type],
+            ["ticks", h.ticks],
+            ["seed", h.seed],
+            ["行政层级", h.admin_level],
+            ["地名", h.jurisdiction_name || "—"],
+            ["发行方类型", h.issuer_archetype],
+            ["brand_equity", h.brand_equity],
+            ["议题刚需proxy", h.problem_salience != null ? h.problem_salience : "—"],
+          ]
+            .map(([k, v]) => `<span class="pill">${k}: ${v}</span>`)
+            .join(" ");
+        }
+        renderHorizon(ev.horizon_forecast || {});
+        if (ev.detail_events && ev.detail_events.length) {
+          document.getElementById("detailPanel").innerHTML = "";
+          appendDetailEvents(ev.detail_events);
+        }
+        document.getElementById("narrative").textContent = (ev.narrative || []).join("\n");
+        const sec = ev.elapsed_seconds_so_far != null ? `（已用时 ${ev.elapsed_seconds_so_far}s）` : "";
+        const pk = ev.pause_kind || "crisis_rule";
+        let pauseLabel = "暂停 · 等待处置方案";
+        if (pk === "risk_milestone") pauseLabel = "暂停 · 内部风险盘点（已达关键推演次数）";
+        if (pk === "desk_review") pauseLabel = "暂停 · 待确认可行性（未确认则不继续 tick）";
+        document.getElementById("status").innerHTML =
+          '<span style="color:#e0af68">' + pauseLabel + "</span>" + sec;
+        document.getElementById("inlineHint").textContent =
+          pk === "desk_review"
+            ? "桌面已研判：可确认继续，或「评估另一套 / 修改并重评」。弹窗右上角可载入历史方案。"
+            : pk === "risk_milestone"
+              ? "已达关键推演次数：请填应对方案（可多套）；研判后需确认才继续。"
+              : "已暂停：可填多套方案（--- 分隔）；研判后需确认才继续。";
+        document.getElementById("crisisBackdrop").classList.add("show");
+        return "stop";
+      } else if (ph === "error") {
+        document.getElementById("errBox").style.display = "block";
+        document.getElementById("errBox").textContent =
+          (ev.error || "未知错误") + (ev.traceback ? "\n\n" + ev.traceback : "");
+        document.getElementById("status").textContent = "失败";
+        return "stop";
+      }
+      return null;
+    }
+
+    async function runScenarioStream(url, jsonBody) {
+      await ensurePepoleApiBase();
+      document.getElementById("errBox").style.display = "none";
+      const ac = new AbortController();
+      window.__pepoleStreamAbort = ac;
+      const stopBtn = document.getElementById("stopStreamBtn");
+      if (stopBtn) {
+        stopBtn.style.display = "inline-block";
+        stopBtn.disabled = false;
+      }
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(jsonBody),
+          signal: ac.signal,
+        });
+        if (!res.ok) {
+          let msg = res.status + " " + res.statusText;
+          try {
+            const j = await res.json();
+            if (j.detail) msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+          } catch (_) {
+            const t = await res.text();
+            if (t) msg = t.slice(0, 800);
+          }
+          throw new Error(msg);
+        }
+        let outcome = "truncated";
+        await readSseStream(res, {
+          onEvent(ev) {
+            const r = handleStreamEvent(ev);
+            if (r === "stop") {
+              if (ev.phase === "complete") outcome = "complete";
+              else if (ev.phase === "crisis_pause") outcome = "crisis";
+              else if (ev.phase === "error") outcome = "error";
+              else outcome = "stop";
+            }
+            return r;
+          },
+        });
+        return outcome;
+      } catch (e) {
+        if (e && e.name === "AbortError") {
+          appendLiveLog(
+            "—— 已停止：已断开流式连接（服务器端可能仍在收尾；若未到暂停点则无 checkpoint） ——",
+          );
+          document.getElementById("status").innerHTML =
+            '<span style="color:#e0af68">已中止</span>（可再次开始运行）';
+          return "aborted";
+        }
+        throw e;
+      } finally {
+        window.__pepoleStreamAbort = null;
+        if (stopBtn) stopBtn.style.display = "none";
+        releaseStreamLocks();
+      }
+    }
+
+    document.getElementById("historyPlanPick").addEventListener("change", function () {
+      const i = parseInt(this.value, 10);
+      if (!Number.isFinite(i) || !window.__decisionHistory || !window.__decisionHistory[i]) return;
+      const h = window.__decisionHistory[i];
+      const t = (h.plain_full || h.plain_excerpt || "").trim();
+      if (t) document.getElementById("crisisSolution").value = t;
+    });
+
+    function showDeskReevalMode(prefill) {
+      const ta = document.getElementById("crisisSolution");
+      const lbl = document.getElementById("crisisSolutionLabel");
+      const mh = document.getElementById("crisisMultiHint");
+      ta.style.display = "block";
+      lbl.style.display = "block";
+      mh.style.display = "block";
+      lbl.textContent =
+        "编辑后提交将重新做专业转化与桌面研判（不会消耗新 checkpoint 直至提交）。";
+      document.getElementById("crisisSubmitBar").style.display = "flex";
+      document.getElementById("crisisSubmit").style.display = "inline-block";
+      document.getElementById("crisisSubmit").textContent = "提交重新研判";
+      ta.value = prefill != null ? prefill : "";
+      ta.focus();
+    }
+
+    document.getElementById("reevalDeskBtn").addEventListener("click", () => {
+      showDeskReevalMode("");
+    });
+    document.getElementById("modifyDeskBtn").addEventListener("click", () => {
+      const pe = window.__planEvaluations || [];
+      const first = pe.length && pe[0].plain_full ? pe[0].plain_full : "";
+      showDeskReevalMode(first);
+    });
+
+    document.getElementById("decisionEvalOnlyBtn").addEventListener("click", async () => {
+      const text = document.getElementById("decisionLayerDraft").value.trim();
+      if (!text) {
+        alert("请填写草案后再评估");
+        return;
+      }
+      const out = document.getElementById("decisionEvalResult");
+      out.style.display = "block";
+      out.textContent = "评估中…";
+      try {
+        await ensurePepoleApiBase();
+        const scen = scenarioFileForApi();
+        const bindCk = document.getElementById("decisionEvalBindCkpt");
+        const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
+        if (!useCkpt && !scen) {
+          throw new Error("请先选择有效的场景 YAML（左侧下拉框），或勾选「绑定 checkpoint」使用暂停快照。");
+        }
+        const body = mergeRunRequestBody({
+          scenario_file: scen || "default.yaml",
+          seed: parseInt(document.getElementById("seed").value, 10) || 42,
+          plain_solution: text,
+          ...apiFields(),
+        });
+        const b = document.getElementById("brief").value.trim();
+        if (b) body.brief = b;
+        if (useCkpt) body.checkpoint_token = window.__pepoleCheckpoint;
+        else delete body.checkpoint_token;
+        const res = await fetch(pepoleApiUrl("/api/plan/evaluate"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const raw = await res.text();
+        let j = {};
+        if (raw) {
+          try {
+            j = JSON.parse(raw);
+          } catch (_) {
+            if (!res.ok) throw new Error(raw.slice(0, 600) || res.statusText);
+            throw new Error("响应不是 JSON：" + raw.slice(0, 200));
+          }
+        }
+        if (!res.ok) {
+          const msg = j.detail ?? j.error ?? raw.slice(0, 400) ?? res.statusText;
+          const s = typeof msg === "string" ? msg : JSON.stringify(msg);
+          throw new Error(formatPepoleApi404Hint(res.status, s));
+        }
+        out.textContent = formatPlanEvaluateView(j);
+        window.__lastPlanEvaluatePayload = j;
+        const plainCur = document.getElementById("decisionLayerDraft").value.trim();
+        if (plainCur) {
+          window.__draftPlanCandidates.unshift({
+            id: "p" + Date.now(),
+            label:
+              "[" +
+              new Date().toLocaleString() +
+              "] " +
+              plainCur.slice(0, 40) +
+              (plainCur.length > 40 ? "…" : ""),
+            plain: plainCur,
+            digest: j.digest || {},
+            desk: j.desk || {},
+          });
+          window.__draftPlanCandidates = window.__draftPlanCandidates.slice(0, 16);
+        }
+        refreshDraftPlanCandidateSelect();
+        updateEvalCommitmentHintFromPayload(j);
+        document.getElementById("decisionEvalFollowup").style.display = "block";
+      } catch (e) {
+        out.textContent = String(e);
+      }
+    });
+
+    document.getElementById("decisionConfirmExecBtn").addEventListener("click", async () => {
+      const payload = window.__lastPlanEvaluatePayload;
+      if (!payload || payload.ok === false) {
+        alert("请先点击「仅评估本草案」并等待成功。");
+        return;
+      }
+      const text = document.getElementById("decisionLayerDraft").value.trim();
+      if (!text) {
+        alert("草案文本为空。");
+        return;
+      }
+      const out = document.getElementById("decisionEvalResult");
+      try {
+        await ensurePepoleApiBase();
+        const scen = scenarioFileForApi();
+        const bindCk = document.getElementById("decisionEvalBindCkpt");
+        const useCkpt = !!(window.__pepoleCheckpoint && bindCk && bindCk.checked);
+        if (!useCkpt && !scen) throw new Error("请选择场景 YAML，或勾选绑定 checkpoint。");
+        const body = mergeRunRequestBody({
+          scenario_file: scen || "default.yaml",
+          seed: parseInt(document.getElementById("seed").value, 10) || 42,
+          plain_solution: text,
+          evaluation_digest: payload.digest || {},
+          evaluation_desk: payload.desk || {},
+          ...apiFields(),
+        });
+        const b = document.getElementById("brief").value.trim();
+        if (b) body.brief = b;
+        if (useCkpt) body.checkpoint_token = window.__pepoleCheckpoint;
+        else delete body.checkpoint_token;
+        const res = await fetch(pepoleApiUrl("/api/plan/confirm-execute"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const raw = await res.text();
+        let jr = {};
+        if (raw) {
+          try {
+            jr = JSON.parse(raw);
+          } catch (_) {
+            if (!res.ok) throw new Error(raw.slice(0, 500) || res.statusText);
+            throw new Error("响应不是 JSON");
+          }
+        }
+        if (!res.ok) {
+          const msg = jr.detail ?? jr.error ?? raw.slice(0, 400) ?? res.statusText;
+          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+        }
+        window.__pendingInternalCommit = null;
+        if (jr.checkpoint_token) window.__pepoleCheckpoint = jr.checkpoint_token;
+        else if (jr.internal_plan_commit) window.__pendingInternalCommit = jr.internal_plan_commit;
+        const ap = jr.applied || {};
+        const cm = ap.commitment || {};
+        updateDecisionLayerPanel(ap.decision_layer_excerpt || "");
+        const tail = [];
+        if (cm.due_tick != null)
+          tail.push("约定在第 " + cm.due_tick + " tick 输出「检视」提醒（演练推进到该 tick 时出现在叙事与日志）。");
+        if (cm.expected_outputs_cn) tail.push(String(cm.expected_outputs_cn).slice(0, 500));
+        out.textContent =
+          formatPlanEvaluateView(payload) +
+          "\n\n══ 已确认执行（沙盘已写入）══\n" +
+          tail.join("\n") +
+          "\n" +
+          (jr.checkpoint_token ? "已更新 checkpoint，可继续续跑。\n" : "已排队：下次点「开始运行」时在 tick0 写入。\n") +
+          "\n" +
+          JSON.stringify(jr, null, 2);
+        const hint = document.getElementById("evalCommitmentHint");
+        if (hint)
+          hint.innerHTML =
+            "<strong>已确认执行。</strong> " +
+            (cm.due_tick != null ? "将在第 " + cm.due_tick + " tick 提示约定检视。" : "");
+      } catch (e) {
+        alert(String(e));
+      }
+    });
+
+    document.getElementById("decisionDiscardEvalBtn").addEventListener("click", () => {
+      window.__lastPlanEvaluatePayload = null;
+      document.getElementById("decisionEvalFollowup").style.display = "none";
+      document.getElementById("decisionLayerDraft").value = "";
+      document.getElementById("decisionLayerDraft").focus();
+      const el = document.getElementById("evalCommitmentHint");
+      if (el) el.textContent = "请重写草案后再点「仅评估」；上方下拉仍可载入历史候选。";
+    });
+
+    document.getElementById("draftPlanCandidateSelect").addEventListener("change", function () {
+      const i = parseInt(this.value, 10);
+      if (!Number.isFinite(i) || i < 0) return;
+      const c = (window.__draftPlanCandidates || [])[i];
+      if (!c || !c.plain) return;
+      document.getElementById("decisionLayerDraft").value = c.plain;
+      window.__lastPlanEvaluatePayload = {
+        ok: true,
+        digest: c.digest || {},
+        desk: c.desk || {},
+        tick_context: null,
+      };
+      updateEvalCommitmentHintFromPayload(window.__lastPlanEvaluatePayload);
+      document.getElementById("decisionEvalFollowup").style.display = "block";
+    });
+
+    document.getElementById("stopStreamBtn").addEventListener("click", () => {
+      const ac = window.__pepoleStreamAbort;
+      if (!ac) return;
+      const sb = document.getElementById("stopStreamBtn");
+      if (sb) sb.disabled = true;
+      ac.abort();
+    });
+
+    document.getElementById("runBtn").onclick = async () => {
+      window.__pepoleCheckpoint = null;
+      window.__pepolePauseKind = null;
+      window.__planEvaluations = [];
+      fillHistorySelect([]);
+      updateDecisionLayerPanel("");
+      window.__lastPlanEvaluatePayload = null;
+      document.getElementById("decisionEvalFollowup").style.display = "none";
+      document.getElementById("decisionEvalResult").style.display = "none";
+      document.getElementById("decisionEvalResult").textContent = "";
+      const peStrip = document.getElementById("planEvalStrip");
+      peStrip.style.display = "none";
+      peStrip.innerHTML = "";
+      document.getElementById("deskReviewBar").style.display = "none";
+      document.getElementById("crisisSubmitBar").style.display = "flex";
+      document.getElementById("crisisSolutionLabel").textContent =
+        "处置方案（将写入叙事并进入后续各智能体上下文）";
+      document.getElementById("crisisSolution").style.display = "block";
+      document.getElementById("crisisSolutionLabel").style.display = "block";
+      document.getElementById("crisisMultiHint").style.display = "block";
+      document.getElementById("confirmProceedBtn").style.display = "none";
+      document.getElementById("crisisSubmit").style.display = "inline-block";
+      document.getElementById("crisisSubmit").textContent = "提交方案并研判";
+      document.getElementById("planPick").style.display = "none";
+      document.getElementById("planPickLabel").style.display = "none";
+      document.getElementById("crisisBackdrop").classList.remove("show");
+      document.getElementById("errBox").style.display = "none";
+      document.getElementById("narrative").textContent = "";
+      document.getElementById("headerInfo").innerHTML = "";
+      document.getElementById("finalMetrics").innerHTML = "";
+      document.getElementById("liveLog").textContent = "";
+      document.getElementById("liveLog").style.display = "none";
+      document.getElementById("liveDetail").textContent = "";
+      window.__financeEnabled = false;
+      window.__exerciseType = "";
+      document.getElementById("financeSnapshot").innerHTML =
+        '<span class="fs-muted">尚未运行；启用财务后此处显示账面现金、财力池与债务。</span>';
+      document.getElementById("chartFinanceRow").style.display = "none";
+      document.getElementById("inlineHint").textContent = "当前未进入暂停状态。";
+      document.getElementById("inlineSolution").value = "";
+      document.getElementById("horizonPanel").innerHTML =
+        '<p class="hint hint-only" style="margin:0;">等待首轮 tick 结束…</p>';
+      document.getElementById("detailPanel").innerHTML =
+        '<p class="hint hint-only" style="margin:0;">等待细节事件…</p>';
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
+      if (chartExt) {
+        chartExt.destroy();
+        chartExt = null;
+      }
+      if (chartFinance) {
+        chartFinance.destroy();
+        chartFinance = null;
+      }
+      if (ensembleChart) {
+        ensembleChart.destroy();
+        ensembleChart = null;
+      }
+      const es = document.getElementById("ensembleSummary");
+      if (es) {
+        es.style.display = "none";
+        es.textContent = "";
+      }
+      document.getElementById("ensembleHint").textContent = "";
+      resetNetwork();
+      renderRiskBoard({});
+      setRunning(true, "连接流式接口…");
+      const body = mergeRunRequestBody({
+        scenario_file: document.getElementById("scenario").value,
+        seed: parseInt(document.getElementById("seed").value, 10) || 42,
+        brief: document.getElementById("brief").value.trim() || null,
+        ...apiFields(),
+      });
+      try {
+        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/stream"), body);
+        if (outcome === "truncated") {
+          document.getElementById("errBox").style.display = "block";
+          document.getElementById("errBox").textContent = "流意外结束，未收到完成或暂停事件";
+          document.getElementById("status").textContent = "失败";
+        }
+      } catch (e) {
+        document.getElementById("errBox").style.display = "block";
+        document.getElementById("errBox").textContent = String(e);
+        document.getElementById("status").textContent = "请求异常";
+      } finally {
+        document.getElementById("runBtn").disabled = false;
+        document.getElementById("crisisSubmit").disabled = false;
+      }
+    };
+
+    document.getElementById("confirmProceedBtn").onclick = async () => {
+      const tok = window.__pepoleCheckpoint;
+      if (!tok) {
+        alert("缺少 checkpoint，请重新开始演练");
+        return;
+      }
+      const idxRaw = document.getElementById("planPick").value;
+      let selected_plan_index = null;
+      if (idxRaw !== "" && idxRaw != null) {
+        const n = parseInt(idxRaw, 10);
+        if (Number.isFinite(n)) selected_plan_index = n;
+      }
+      document.getElementById("crisisBackdrop").classList.remove("show");
+      setRunning(true, "确认继续演练…");
+      try {
+        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), {
+          checkpoint_token: tok,
+          resume_stage: "confirm_proceed",
+          selected_plan_index,
+          ...apiFields(),
+        });
+        if (outcome === "truncated") {
+          document.getElementById("errBox").style.display = "block";
+          document.getElementById("errBox").textContent = "续跑流意外结束";
+          document.getElementById("status").textContent = "失败";
+        }
+      } catch (e) {
+        document.getElementById("errBox").style.display = "block";
+        document.getElementById("errBox").textContent = String(e);
+        document.getElementById("status").textContent = "请求异常";
+      } finally {
+        document.getElementById("runBtn").disabled = false;
+        document.getElementById("crisisSubmit").disabled = false;
+        document.getElementById("confirmProceedBtn").disabled = false;
+      }
+    };
+
+    document.getElementById("financePatchApply").onclick = async () => {
+      const tok = window.__pepoleCheckpoint;
+      const st = document.getElementById("financePatchStatus");
+      st.textContent = "";
+      if (!tok) {
+        alert("无 checkpoint：请先运行至暂停。");
+        return;
+      }
+      const body = { checkpoint_token: tok, note: (document.getElementById("financePatchNote").value || "").trim() };
+      const c = document.getElementById("financePatchCash").value.trim();
+      const f = document.getElementById("financePatchFiscal").value.trim();
+      const d = document.getElementById("financePatchDebt").value.trim();
+      if (c !== "") body.set_cash_balance_million = Number(c);
+      if (f !== "") body.set_fiscal_remaining_billion = Number(f);
+      if (d !== "") body.set_debt_balance_million = Number(d);
+      if (c === "" && f === "" && d === "" && !body.note) {
+        alert("请至少填写一项 set 或备注");
+        return;
+      }
+      try {
+        await ensurePepoleApiBase();
+        const r = await fetch(pepoleApiUrl("/api/finance/adjust-checkpoint"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          st.textContent = j.detail || j.error || "失败";
+          return;
+        }
+        window.__pepoleCheckpoint = j.checkpoint_token;
+        st.textContent = "已切换新 checkpoint";
+        document.getElementById("financePatchNote").value = "";
+      } catch (e) {
+        st.textContent = String(e);
+      }
+    };
+
+    document.getElementById("crisisSubmit").onclick = async () => {
+      const tok = window.__pepoleCheckpoint;
+      const sol = document.getElementById("crisisSolution").value.trim();
+      if (!tok) {
+        alert("缺少 checkpoint，请重新开始演练");
+        return;
+      }
+      if (!sol) {
+        alert("请填写处置方案");
+        return;
+      }
+      document.getElementById("inlineSolution").value = sol;
+      document.getElementById("crisisBackdrop").classList.remove("show");
+      setRunning(true, "提交方案并研判…");
+      try {
+        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
+        if (outcome === "truncated") {
+          document.getElementById("errBox").style.display = "block";
+          document.getElementById("errBox").textContent = "续跑流意外结束";
+          document.getElementById("status").textContent = "失败";
+        }
+      } catch (e) {
+        document.getElementById("errBox").style.display = "block";
+        document.getElementById("errBox").textContent = String(e);
+        document.getElementById("status").textContent = "请求异常";
+      } finally {
+        document.getElementById("runBtn").disabled = false;
+        document.getElementById("crisisSubmit").disabled = false;
+        document.getElementById("confirmProceedBtn").disabled = false;
+      }
+    };
+
+    document.getElementById("inlineResumeBtn").onclick = async () => {
+      const tok = window.__pepoleCheckpoint;
+      const sol = document.getElementById("inlineSolution").value.trim();
+      if (!tok) {
+        alert("当前还没有暂停点。先运行，出现“暂停”后再提交。");
+        return;
+      }
+      if (!sol) {
+        alert("请输入处置方案再继续。");
+        return;
+      }
+      document.getElementById("crisisSolution").value = sol;
+      document.getElementById("crisisBackdrop").classList.remove("show");
+      setRunning(true, "提交方案并研判…");
+      try {
+        const outcome = await runScenarioStream(pepoleApiUrl("/api/run/resume/stream"), buildResumeSubmitBody(tok, sol));
+        if (outcome === "truncated") {
+          document.getElementById("errBox").style.display = "block";
+          document.getElementById("errBox").textContent = "续跑流意外结束";
+          document.getElementById("status").textContent = "失败";
+        } else {
+          document.getElementById("inlineHint").textContent = "续跑已提交。";
+        }
+      } catch (e) {
+        document.getElementById("errBox").style.display = "block";
+        document.getElementById("errBox").textContent = String(e);
+        document.getElementById("status").textContent = "请求异常";
+      } finally {
+        document.getElementById("runBtn").disabled = false;
+        document.getElementById("crisisSubmit").disabled = false;
+        document.getElementById("confirmProceedBtn").disabled = false;
+        document.getElementById("inlineResumeBtn").disabled = false;
+      }
+    };
+
+    document.getElementById("openWizardBtn").addEventListener("click", () => openScenarioWizard());
+    document.getElementById("wizardCloseBtn").addEventListener("click", () => {
+      localStorage.setItem("pepole_wizard_intro_done", "1");
+      closeScenarioWizard();
+    });
+    document.getElementById("wizardApplyBtn").addEventListener("click", () => {
+      localStorage.setItem("pepole_wizard_intro_done", "1");
+      document.getElementById("scenario").value = document.getElementById("wizScenarioSelect").value;
+      document.getElementById("brief").value = document.getElementById("wizBrief").value;
+      window.__wizardOverrides = collectWizardOverridesFromForm();
+      updateWizardStatusHint();
+      closeScenarioWizard();
+    });
+    document.querySelectorAll(".wiz-presets [data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => applyWizardPreset(btn.getAttribute("data-preset")));
+    });
+    document.getElementById("wizScenarioSelect").addEventListener("change", function () {
+      document.getElementById("scenario").value = this.value;
+    });
+    document.getElementById("scenario").addEventListener("change", () => syncWizardScenarioOptions());
+
+    document.getElementById("ensembleBtn").onclick = async () => {
+      const hint = document.getElementById("ensembleHint");
+      const pre = document.getElementById("ensembleSummary");
+      let okRun = false;
+      let ensAborted = false;
+      hint.textContent = "";
+      pre.style.display = "none";
+      pre.textContent = "";
+      setRunning(true, "ensemble 并行演练（无流式进度）…");
+      try {
+        await ensurePepoleApiBase();
+        const body = mergeRunRequestBody({
+          scenario_file: document.getElementById("scenario").value,
+          seed: parseInt(document.getElementById("seed").value, 10) || 42,
+          brief: document.getElementById("brief").value.trim() || null,
+          runs: Math.min(256, Math.max(1, parseInt(document.getElementById("ensRuns").value, 10) || 8)),
+          workers: Math.min(64, Math.max(1, parseInt(document.getElementById("ensWorkers").value, 10) || 4)),
+          threshold_key: document.getElementById("ensThKey").value.trim() || "policy_support",
+          threshold: Number(document.getElementById("ensThVal").value) || 0.55,
+          ...apiFields(),
+        });
+        const ac = new AbortController();
+        window.__pepoleStreamAbort = ac;
+        let res;
+        try {
+          res = await fetch(pepoleApiUrl("/api/ensemble"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            signal: ac.signal,
+          });
+        } catch (e) {
+          if (e && e.name === "AbortError") {
+            hint.textContent = "已中止（已取消 ensemble 请求）";
+            ensAborted = true;
+            return;
+          }
+          throw e;
+        } finally {
+          window.__pepoleStreamAbort = null;
+        }
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg = j.error || j.detail || (typeof j.detail === "object" ? JSON.stringify(j.detail) : "") || res.statusText;
+          throw new Error(msg || "请求失败");
+        }
+        if (!j.summary) {
+          throw new Error(j.error || "响应缺少 summary");
+        }
+        okRun = true;
+        pre.style.display = "block";
+        pre.textContent = JSON.stringify(
+          {
+            header: j.header,
+            summary: {
+              n: j.summary.n,
+              p_estimate: j.summary.p_estimate,
+              threshold_key: j.summary.threshold_key,
+              threshold: j.summary.threshold,
+              mean_policy_support: j.summary.mean_policy_support,
+              mean_unrest: j.summary.mean_unrest,
+              distributions: j.summary.distributions,
+            },
+            run_seeds: (j.runs || []).map((r) => r.seed),
+          },
+          null,
+          2
+        );
+        renderEnsembleChart(j.summary);
+        hint.textContent =
+          `n=${j.summary.n} · P(${j.summary.threshold_key}≥${j.summary.threshold})≈${(j.summary.p_estimate * 100).toFixed(1)}% · 均值支持度 ${Number(j.summary.mean_policy_support).toFixed(3)}`;
+      } catch (e) {
+        pre.style.display = "block";
+        pre.textContent = String(e);
+        hint.textContent = "";
+      } finally {
+        setRunning(false);
+        if (okRun) {
+          document.getElementById("status").innerHTML =
+            '<span style="color:var(--ok)">ensemble 完成</span>（结果见下方）';
+        } else if (ensAborted) {
+          document.getElementById("status").innerHTML =
+            '<span style="color:#e0af68">已中止</span>（可再次估计终局分布）';
+        }
+      }
+    };
+
+    initNetwork();
+    loadScenarios()
+      .then(() => {
+        if (!localStorage.getItem("pepole_wizard_intro_done")) {
+          openScenarioWizard();
+        }
+      })
+      .catch((e) => {
+        document.getElementById("status").textContent = "无法加载场景列表: " + e;
+      });
+  </script>
+</body>
+</html>

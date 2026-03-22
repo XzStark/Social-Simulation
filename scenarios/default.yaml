@@ -1,0 +1,79 @@
+# 政策制定者演练：下达措施/条文要点，观察舆情、支持度与动荡
+name: default_policy_sandbox
+exercise_type: policy
+player_brief: |
+  拟推行「数据要素分类分级管理办法」草案：企业须在 90 日内完成自评备案；
+  违规处罚按营业额比例罚没；设 6 个月过渡期。面向公众说明重点为隐私保护与中小企业减负。
+
+policy_context:
+  admin_level: province
+  jurisdiction_name: 某省
+  local_norms_brief: |
+    省会与地市差异大：县域人情网络强、短视频传播快；省级媒体与部委条线口径需对齐。
+  media_environment_brief: |
+    省级融媒 + 市场化财经媒体并存，自媒体断章风险高。
+
+reference_cases_brief: ""
+
+issuer:
+  archetype: large_group
+  brand_equity: 0.5
+  reputation_brief: ""
+  supply_chain_position: ""
+
+ticks: 8
+random_seed: 42
+
+# 宏观初值
+initial:
+  sentiment: 0.0          # -1 反对 … +1 支持
+  economy_index: 0.5    # 0..1
+  policy_support: 0.45  # 0..1
+  rumor_level: 0.1      # 0..1
+  unrest: 0.15          # 0..1
+
+# 海量人口 → 若干 cohort（每个 cohort 代表一类人群，权重=人口占比）
+cohorts:
+  - id: urban_youth
+    weight: 0.35
+    class_layer: middle
+    traits: { media_exposure: 0.85, risk_aversion: 0.4 }
+  - id: suburban_family
+    weight: 0.30
+    class_layer: middle
+    traits: { media_exposure: 0.55, risk_aversion: 0.65 }
+  - id: rural_older
+    weight: 0.20
+    class_layer: lower
+    traits: { media_exposure: 0.35, risk_aversion: 0.7 }
+  - id: business_owners
+    weight: 0.15
+    class_layer: upper
+    traits: { media_exposure: 0.7, risk_aversion: 0.5 }
+
+# 关键角色：每 tick 可调 LLM（数量少）
+key_actors:
+  - id: regulator
+    role: 监管机构官员
+    goals: 稳预期、可执行、少舆情爆点
+  - id: industry_lobby
+    role: 行业协会代表
+    goals: 降低合规成本、争取过渡期
+  - id: civic_watchdog
+    role: 公益监督组织
+    goals: 透明度、弱势群体保护
+
+# 可选：对 cohort 用「轻量模型」做批量解读（关闭则纯规则）
+cohort_llm:
+  enabled: false
+  # 每 tick 1 次调用，把宏观状态压缩成对各 cohort 的扰动（非每 cohort 一次也可 batch）
+
+# 可选：仅当指标过线才暂停等你出方案（推荐）。默认不按「满几次 LLM」暂停（risk_milestone_primary_calls 默认 0）。
+# crisis_rules:
+#   - id: rumor_hot
+#     when_all:
+#       - metric: rumor_level
+#         gte: 0.22
+#     title: 谣言升温
+#     detail: 请指挥台写应对要点后再续跑。
+#     once: true
