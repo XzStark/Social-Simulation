@@ -31,19 +31,6 @@
 
 ---
 
-## 「红楼梦式」80+ 智能体怎么落地？
-
-- **人设（persona）**：在 YAML 的 `personas` 里一人一条：`id`、`role`、`goals`、长文 **`persona`**（小传）、**`categories`**（购买者/竞品/律师/境外监管等）。
-- **不等于每 tick 调 80 次模型**：名册可以 **80+**，每轮只 **唤醒** 一部分：
-  - **`llm_each_tick: true`**：每 tick 必调用（如核心监管叙事、主编）。
-  - **池化人设**：由 **`simulation.pooled_llm_calls_per_tick`** 控制每 tick 从池里 **加权无放回** 抽几个；**`always_sample_ids`** 可固定「首席竞品」「欧盟合规顾问」等优先占坑。
-- **世界范围**：**`simulation.markets_active`**（`domestic` / `export`）与 **`product_kind`**（`software` / `hardware` / `hybrid` / `general`）会过滤人设：只让「会登场」的角色进池（例如只做国内硬件的渠道商不会在你勾选「仅软件+出口」时进池）。
-- **大众面**：仍用 **`cohorts`** 表示千万级购买者/公众；需要时再开 **`cohort_llm`** 用轻量模型批量推态度。
-
-这样可满足：**购买者是否买账、竞品、打官司叙事、出口与境外规则** 等角色都存在，且成本可控。
-
----
-
 ## 快速开始
 
 ```bash
