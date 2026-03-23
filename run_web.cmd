@@ -1,16 +1,38 @@
 @echo off
-chcp 65001 >nul
+setlocal EnableExtensions
 cd /d "%~dp0"
-REM 请勿在本文件写入 API 密钥。请先在终端设置环境变量，例如：
-REM   set OPENAI_API_KEY=你的密钥
-REM   set OPENAI_BASE_URL=https://api.openai.com/v1
-REM 密钥示例脚本（填好密钥后在 CMD 里 call 一次再运行本文件）：
-REM   配置示例-OpenAI-ChatGPT.cmd  配置示例-Gemini.cmd  配置示例-Claude.cmd  配置示例-DeepSeek.cmd
-REM 未设置 OPENAI_API_KEY 时，部分推理为 Dry-Run，仍可打开网页浏览。
+REM Do not put API keys here. Set OPENAI_API_KEY etc. in the environment first.
+REM Use the sample *.cmd files in this folder (call them once before run_web).
 
-REM 若提示端口占用，可先运行「结束端口占用.cmd」，或改下面 PORT 为其它数字
 set PORT=8770
-echo 浏览器访问: http://127.0.0.1:%PORT%（约 2 秒后自动打开）
-echo 按 Ctrl+C 停止服务
-start "" cmd /c "timeout /t 2 /nobreak >nul & start "" http://127.0.0.1:%PORT%/"
+
+where py >nul 2>&1 && goto run_py
+where python >nul 2>&1 && goto run_python
+
+echo [ERROR] Neither "py" nor "python" was found in PATH.
+echo Install Python from https://www.python.org/downloads/ and enable "Add python.exe to PATH".
+pause
+exit /b 1
+
+:run_py
+echo Using: py -3
+echo Browser opens in ~4s at http://127.0.0.1:%PORT%/
+echo Keep this window open. Ctrl+C stops the server.
+start /MIN cmd /c "ping -n 5 127.0.0.1>nul & start http://127.0.0.1:%PORT%/"
+py -3 -m uvicorn people.webapp:app --host 127.0.0.1 --port %PORT%
+goto uvicorn_done
+
+:run_python
+echo Using: python
+echo Browser opens in ~4s at http://127.0.0.1:%PORT%/
+echo Keep this window open. Ctrl+C stops the server.
+start /MIN cmd /c "ping -n 5 127.0.0.1>nul & start http://127.0.0.1:%PORT%/"
 python -m uvicorn people.webapp:app --host 127.0.0.1 --port %PORT%
+
+:uvicorn_done
+if errorlevel 1 (
+  echo.
+  echo Server exited with an error. If you did not press Ctrl+C, read messages above.
+  echo If the port is in use, free it or edit PORT at the top of this file.
+  pause
+)
