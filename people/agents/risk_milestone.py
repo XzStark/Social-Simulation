@@ -58,9 +58,22 @@ _SYSTEM_DESK = (
   "recommended_internal_next_steps": ["string", ...],
   "why_not_feasible": ["string", ...],
   "caveat": "string（再次强调仅限内部桌面推演）",
-  "estimated_timeline_desk_cn": "string（与专业转化中的阶段周期对齐或细化内部里程碑；演练估计，非承诺）"
+  "estimated_timeline_desk_cn": "string（与专业转化中的阶段周期对齐或细化内部里程碑；演练估计，非承诺）",
+  "safety_score": 0,
+  "safety_summary": "string",
+  "risk_items": [
+    {
+      "risk_level": "high" | "medium" | "low",
+      "risk_name": "string",
+      "impact": "string",
+      "user_action": "string"
+    }
+  ]
 }
 why_not_feasible：若 verdict 为 go 仍可能存在的内部短板；若为 no_go/conditional/needs_more_info 则写清**卡点与不可行原因**（条目式）。
+safety_score：0~100（越高代表在当前态势下越可控）；必须给出。
+safety_summary：一句结论式话术（示例：整体风险可控，但有2个高风险坑需先调整后再执行）。
+risk_items：至少 2 条，必须写出「风险等级 + 是什么风险 + 会有什么影响 + 用户改怎么做」。
 """
     + "\n\n"
     + REALISM_SOCIAL_LAYER
@@ -188,7 +201,60 @@ def evaluate_internal_desk_feasibility(
         raw = client.complete_json(system=_SYSTEM_DESK, user=user, temperature=temperature)
     except Exception:
         return None
-    return raw if isinstance(raw, dict) else None
+    if not isinstance(raw, dict):
+        return None
+    sc = raw.get("safety_score")
+    try:
+        raw["safety_score"] = int(round(float(sc)))
+    except Exception:
+        raw["safety_score"] = 58
+    raw["safety_score"] = max(0, min(100, int(raw["safety_score"])))
+    raw["safety_summary"] = str(raw.get("safety_summary") or "").strip()
+    items = raw.get("risk_items")
+    cleaned: list[dict[str, str]] = []
+    if isinstance(items, list):
+        for it in items[:8]:
+            if not isinstance(it, dict):
+                continue
+            lv = str(it.get("risk_level") or "medium").strip().lower()
+            if lv not in ("high", "medium", "low"):
+                lv = "medium"
+            rn = str(it.get("risk_name") or "").strip()
+            impact = str(it.get("impact") or "").strip()
+            ua = str(it.get("user_action") or "").strip()
+            if rn or impact or ua:
+                cleaned.append(
+                    {
+                        "risk_level": lv,
+                        "risk_name": rn or "未命名风险",
+                        "impact": impact,
+                        "user_action": ua,
+                    }
+                )
+    if not cleaned:
+        cleaned = [
+            {
+                "risk_level": "high",
+                "risk_name": "关键资源与动作不同步",
+                "impact": "执行节奏错配会放大舆情与交付风险，导致方案落地失败。",
+                "user_action": "先锁定资源上限、责任链路和里程碑，再分阶段推进。",
+            },
+            {
+                "risk_level": "medium",
+                "risk_name": "口径与证据链不完整",
+                "impact": "外部质疑时难以稳定预期，可能反复消耗组织信用。",
+                "user_action": "补齐证据与对外问答清单，设置统一发布与复盘机制。",
+            },
+        ]
+    raw["risk_items"] = cleaned
+    if not raw["safety_summary"]:
+        hi = sum(1 for x in cleaned if x.get("risk_level") == "high")
+        raw["safety_summary"] = (
+            f"整体风险可控，但有{hi}个高风险坑需要提前规划调整后推荐执行。"
+            if hi > 0
+            else "整体风险可控，建议按阶段推进并持续复核关键风险。"
+        )
+    return raw
 
 
 def format_desk_feasibility_note(d: dict[str, Any]) -> str:
@@ -219,6 +285,20 @@ def format_desk_feasibility_note(d: dict[str, Any]) -> str:
     etd = str(d.get("estimated_timeline_desk_cn") or "").strip()
     if etd:
         lines.append(f"内部里程碑周期（desk 估计）：{etd}")
+    lines.append(f"安全评估分：{int(d.get('safety_score', 58))}/100")
+    ss = str(d.get("safety_summary") or "").strip()
+    if ss:
+        lines.append(f"本次安全评估：{ss}")
+    risks = d.get("risk_items")
+    if isinstance(risks, list) and risks:
+        for i, r in enumerate(risks[:6], 1):
+            if not isinstance(r, dict):
+                continue
+            lv = str(r.get("risk_level") or "medium")
+            rn = str(r.get("risk_name") or "未命名风险")
+            imp = str(r.get("impact") or "").strip()
+            ua = str(r.get("user_action") or "").strip()
+            lines.append(f"风险{i}[{lv}] {rn}｜影响：{imp or '—'}｜建议：{ua or '—'}")
     wnf = d.get("why_not_feasible")
     if isinstance(wnf, list) and wnf:
         lines.append(

@@ -19,6 +19,7 @@ GROUNDING = (
 - 表态：符合程序与职业伦理（律师不替法院下结论、监管用语克制、买家关心合同与责任边界而非站队口号）。
 - 若 user 中含 your_recent_public_statements（你本人在本场演练中前几轮的公开表态摘录），本轮须**推进叙事**：补充新事实、回应场上新变化或调整措辞；**禁止**与摘录逐字重复或仅换序同义复述；立场可延续但信息增量要明显。
 【人性与阶层】若 cohort 标注 class_layer（基层/中产/高层 proxy），尊重利益与信息渠道差异：基层更敏感于生计、安全与公平感；中产重现金流、教育医疗与预期；高层重合规、声誉、供应链与资本约束。写成有弱点的常人，而非道德漫画。
+【记忆交接】若 user 中含 your_memory_handover_summary，视为上一批长期记忆交接摘要；本轮须与其连续，不得与其冲突。
 【真实案例】若 decision_context 含 reference_cases_brief，只借鉴其机制与约束，不得把未证实细节写成定论。
 【真实世界校准 · 非算命】
 - 输出是**给定 player_brief 与当前指标下的情境推演**，用于压力测试沟通与资源分配，**不是**对真实股价、销量、诉讼结果或监管决定的「精准预测」；禁止「必将」「注定」「一夜颠覆」等断言，宜用「若…则…」「在…条件下更可能出现」。
@@ -135,5 +136,80 @@ def run_key_actor_turn(
     prior = (state.key_actor_recall or {}).get(actor_id)
     if isinstance(prior, list) and prior:
         payload["your_recent_public_statements"] = [str(x) for x in prior[-8:] if str(x).strip()]
+    rollup = (state.key_actor_memory_rollups or {}).get(actor_id)
+    if isinstance(rollup, str) and rollup.strip():
+        payload["your_memory_handover_summary"] = rollup[-1200:]
     user = "当前状态 JSON：\n" + json.dumps(payload, ensure_ascii=False, indent=2)
-    return client.complete_json(system=sys, user=user, temperature=temperature)
+    raw = client.complete_json(system=sys, user=user, temperature=temperature)
+    return _validate_and_normalize_actor_effect(
+        raw if isinstance(raw, dict) else {},
+        actor_id=actor_id,
+        role=role,
+        categories=cats,
+        state=state,
+    )
+
+
+def _validate_and_normalize_actor_effect(
+    eff: dict[str, Any],
+    *,
+    actor_id: str,
+    role: str,
+    categories: list[str],
+    state: WorldState,
+) -> dict[str, Any]:
+    out = dict(eff or {})
+    violations: list[str] = []
+    # Hard numeric bounds to prevent drift / hallucinated extreme deltas.
+    bounded = [
+        "sentiment_delta",
+        "rumor_delta",
+        "policy_support_delta",
+        "unrest_delta",
+    ]
+    for k in bounded:
+        v = out.get(k)
+        if not isinstance(v, (int, float)):
+            out[k] = 0.0
+            violations.append(f"{k}:missing_or_non_numeric")
+            continue
+        fv = float(v)
+        if abs(fv) > 0.12:
+            out[k] = max(-0.12, min(0.12, fv))
+            violations.append(f"{k}:clamped")
+    # Role/category hard guard: legal/compliance/regulator should not extreme favorable stance.
+    text = str(out.get("public_statement") or "").strip()
+    low = text.lower()
+    cat_low = " ".join(str(x).lower() for x in categories)
+    role_low = (role or "").lower()
+    hard_guard = any(x in cat_low or x in role_low for x in ("legal", "compliance", "regulator", "监管", "法务"))
+    if hard_guard and any(x in low for x in ("all clear", "无条件支持", "完全没问题", "零风险")):
+        out["public_statement"] = "目前仍需基于证据与程序继续核验，现阶段不宜作绝对性结论。"
+        violations.append("statement:hard_guard_rewrite")
+    # Drift proxy: similarity with own recent statements (token overlap).
+    prev = list((state.key_actor_recall or {}).get(actor_id, []))
+    drift_score = 0.0
+    if text and prev:
+        a = set(_tok_zh(text))
+        b = set(_tok_zh(" ".join(prev[-3:])))
+        if a and b:
+            overlap = len(a & b) / max(1, len(a | b))
+            drift_score = float(overlap)
+            if overlap > 0.82:
+                violations.append("statement:near_repeat")
+    state.role_drift_scores = {**state.role_drift_scores, actor_id: drift_score}
+    if violations:
+        state.role_guard_events.append(
+            {
+                "tick": state.tick,
+                "actor_id": actor_id,
+                "violations": violations[:8],
+            }
+        )
+        state.role_guard_events = state.role_guard_events[-300:]
+    return out
+
+
+def _tok_zh(s: str) -> list[str]:
+    t = "".join(ch if ch.isalnum() else " " for ch in s)
+    return [x for x in t.split() if len(x) >= 2][:300]

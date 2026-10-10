@@ -6,3 +6,4 @@ rich>=13.7.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 pytest>=8.0.0
+optuna>=4.0.0

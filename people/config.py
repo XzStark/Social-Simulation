@@ -317,6 +317,23 @@ class EnsembleRiskSpec(BaseModel):
     worst_case_sample_n: int = Field(default=3, ge=1, le=20)
 
 
+class InternalIssueSpec(BaseModel):
+    """
+    内部问题概率触发：用于模拟政府/企业/创业/开店中「并非每轮都会发生」
+    但现实中可能出现的内部治理、纪律、合规与组织协同故障。
+    触发后默认暂停，要求用户给出处置方案再继续。
+    """
+
+    enabled: bool = True
+    trigger_pause: bool = True
+    cooldown_ticks: int = Field(default=2, ge=0, le=20)
+    probability_policy_per_tick: float = Field(default=0.09, ge=0.0, le=1.0)
+    probability_enterprise_per_tick: float = Field(default=0.08, ge=0.0, le=1.0)
+    probability_startup_per_tick: float = Field(default=0.11, ge=0.0, le=1.0)
+    probability_shop_per_tick: float = Field(default=0.12, ge=0.0, le=1.0)
+    sampling_scope: Literal["auto", "policy", "enterprise", "startup", "shop"] = "auto"
+
+
 class CohortLLMConfig(BaseModel):
     enabled: bool = False
     batch_all_cohorts: bool = True  # true: 1 call/tick；false: 每 cohort 1 call
@@ -372,6 +389,9 @@ class CausalLayerSpec(BaseModel):
     enabled: bool = False
     rules: list[CausalRuleSpec] = Field(default_factory=list)
     edges: list[CausalEdgeSpec] = Field(default_factory=list)
+    # 可版本化「因果骨架」：以更稳定的 DSL 描述规则/边/依赖，再编译为 rules/edges 执行。
+    # 若提供 skeleton，则运行前会 materialize 覆盖 rules/edges（便于长期演进与依赖管理）。
+    skeleton: dict[str, Any] | None = None
     # 系统级因果治理（非「全方程替代 LLM」，而是审计与告警）
     governance_mode: Literal["off", "warn_llm_without_causal"] = "off"
     governance_metrics: list[MetricName] = Field(default_factory=list)
@@ -520,6 +540,7 @@ class Scenario(BaseModel):
     decision_support: DecisionSupportSpec = Field(default_factory=DecisionSupportSpec)
     ensemble_risk: EnsembleRiskSpec = Field(default_factory=EnsembleRiskSpec)
     regional_grounding: RegionalGroundingSpec = Field(default_factory=RegionalGroundingSpec)
+    internal_issues: InternalIssueSpec = Field(default_factory=InternalIssueSpec)
 
     @classmethod
     def load(cls, path: str | Path) -> Scenario:

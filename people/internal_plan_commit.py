@@ -78,6 +78,7 @@ def apply_confirmed_internal_plan(
     plain: str,
     digest: dict[str, Any],
     desk: dict[str, Any],
+    decision_kind: str | None = None,
 ) -> dict[str, Any]:
     """
     将「已确认」的内部草案写入状态：决策层 directive、叙事、记忆入口、宏观/资金边际、约定节点。
@@ -102,6 +103,7 @@ def apply_confirmed_internal_plan(
             "status": "internal_eval_confirmed",
             "plain_full": plain[:4000],
             "confirmed_at_tick": int(state.tick),
+            "decision_kind": decision_kind or "general",
         }
     )
     state.decision_layer_history = state.decision_layer_history[-48:]

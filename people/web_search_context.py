@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from typing import Any
 
 import httpx
 
 from people.config import RegionalGroundingSpec, Scenario
+
+_CACHE_TTL_SEC = 600.0
+_SEARCH_CACHE: dict[str, tuple[float, list[dict[str, str]], str | None]] = {}
 
 
 def _brave_api_key() -> str:
@@ -157,6 +161,31 @@ def _search_brave(queries: list[str], max_results: int, api_key: str) -> tuple[l
     return hits, err
 
 
+def _cached_search(
+    *,
+    provider: str,
+    queries: list[str],
+    max_results: int,
+    brave_key: str,
+) -> tuple[list[dict[str, str]], str | None]:
+    key = f"{provider}|{max_results}|{brave_key[:8]}|{'||'.join(queries)}"
+    now = time.time()
+    row = _SEARCH_CACHE.get(key)
+    if row and (now - row[0]) <= _CACHE_TTL_SEC:
+        return list(row[1]), row[2]
+    if provider == "brave":
+        hits, err = _search_brave(queries, max_results, brave_key)
+    else:
+        hits, err = _search_duckduckgo(queries, max_results)
+    _SEARCH_CACHE[key] = (now, list(hits), err)
+    if len(_SEARCH_CACHE) > 200:
+        # lightweight GC
+        stale = [k for k, v in _SEARCH_CACHE.items() if (now - v[0]) > _CACHE_TTL_SEC]
+        for k in stale[:80]:
+            _SEARCH_CACHE.pop(k, None)
+    return hits, err
+
+
 def fetch_web_grounding_snippets(scenario: Scenario, rg: RegionalGroundingSpec) -> tuple[str, dict[str, Any]]:
     """
     返回 (拼入快模型上下文的纯文本, 复盘用元数据)。
@@ -179,10 +208,25 @@ def fetch_web_grounding_snippets(scenario: Scenario, rg: RegionalGroundingSpec) 
     mr = max(1, min(15, int(rg.web_search_max_results)))
     mc = max(0, int(rg.web_search_max_chars))
 
-    if provider == "brave":
-        hits, err = _search_brave(queries, mr, _brave_api_key())
-    else:
-        hits, err = _search_duckduckgo(queries, mr)
+    brave_key = _brave_api_key()
+    hits, err = _cached_search(
+        provider=provider,
+        queries=queries,
+        max_results=mr,
+        brave_key=brave_key,
+    )
+    if (not hits) and provider == "duckduckgo":
+        # Practical fallback: when DDG is unstable, try Brave if key exists.
+        fb_hits, fb_err = _cached_search(
+            provider="brave",
+            queries=queries,
+            max_results=mr,
+            brave_key=brave_key,
+        )
+        if fb_hits:
+            hits, err = fb_hits, fb_err
+            provider = "brave"
+            meta["provider"] = provider
 
     # 去重 URL，保留顺序
     seen_u: set[str] = set()

@@ -35,6 +35,15 @@ class ScenarioOverridePayload(BaseModel):
     business_sector_brief: str | None = None
     user_known_local_policy_brief: str | None = None
     user_known_central_policy_brief: str | None = None
+    # —— 内部问题概率触发调参（无需改 YAML）——
+    internal_issues_enabled: bool | None = None
+    internal_issue_trigger_pause: bool | None = None
+    internal_issue_cooldown_ticks: int | None = Field(default=None, ge=0, le=20)
+    internal_issue_probability_policy: float | None = Field(default=None, ge=0.0, le=1.0)
+    internal_issue_probability_enterprise: float | None = Field(default=None, ge=0.0, le=1.0)
+    internal_issue_probability_startup: float | None = Field(default=None, ge=0.0, le=1.0)
+    internal_issue_probability_shop: float | None = Field(default=None, ge=0.0, le=1.0)
+    internal_issue_sampling_scope: Literal["auto", "policy", "enterprise", "startup", "shop"] | None = None
 
 
 def merge_scenario_overrides(
@@ -104,6 +113,27 @@ def merge_scenario_overrides(
         rg_up["user_known_central_policy_brief"] = o.user_known_central_policy_brief.strip()
     if rg_up:
         updates["regional_grounding"] = rg.model_copy(update=rg_up)
+
+    ii = scenario.internal_issues
+    ii_up: dict[str, Any] = {}
+    if o.internal_issues_enabled is not None:
+        ii_up["enabled"] = o.internal_issues_enabled
+    if o.internal_issue_trigger_pause is not None:
+        ii_up["trigger_pause"] = o.internal_issue_trigger_pause
+    if o.internal_issue_cooldown_ticks is not None:
+        ii_up["cooldown_ticks"] = o.internal_issue_cooldown_ticks
+    if o.internal_issue_probability_policy is not None:
+        ii_up["probability_policy_per_tick"] = o.internal_issue_probability_policy
+    if o.internal_issue_probability_enterprise is not None:
+        ii_up["probability_enterprise_per_tick"] = o.internal_issue_probability_enterprise
+    if o.internal_issue_probability_startup is not None:
+        ii_up["probability_startup_per_tick"] = o.internal_issue_probability_startup
+    if o.internal_issue_probability_shop is not None:
+        ii_up["probability_shop_per_tick"] = o.internal_issue_probability_shop
+    if o.internal_issue_sampling_scope is not None:
+        ii_up["sampling_scope"] = o.internal_issue_sampling_scope
+    if ii_up:
+        updates["internal_issues"] = ii.model_copy(update=ii_up)
 
     if updates:
         return scenario.model_copy(update=updates)

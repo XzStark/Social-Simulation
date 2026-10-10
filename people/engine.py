@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import math
+import json
 import random
 import statistics
 import time
 import uuid
+import hashlib
+import hmac
+import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +26,7 @@ from people.agents.risk_milestone import (
     run_risk_inventory_llm,
 )
 from people.agents.user_resolution import format_resolution_note_for_agents, professionalize_plain_resolution
+from people.black_swan import apply_black_swan_event, build_black_swan_event, maybe_pick_internal_issue_preset
 from people.config import Scenario
 from people.context import build_decision_context, enrich_decision_context_for_plan_evaluate
 from people.causal_audit import run_causal_governance_audit
@@ -47,6 +52,8 @@ from people.attribution import (
 from people.experiment_manifest import build_experiment_manifest
 from people.extension_stack import init_extensions_state, run_extension_plugins
 from people.state import WorldState
+from people.causal_skeleton import materialize_causal_layer_from_skeleton
+from people.causal_identifiability import assess_edges_identifiability
 
 
 def _people_package_version() -> str:
@@ -143,7 +150,7 @@ def build_initial_state(scenario: Scenario, rng: random.Random) -> WorldState:
 
 
 def _intervention_notes_block(state: WorldState) -> str:
-    return "\n\n".join(state.user_resolution_notes)
+    return "\n\n".join(list(state.user_resolution_notes[-24:]))
 
 
 def _append_synthetic_details(state: WorldState, scenario: Scenario, rng: random.Random) -> None:
@@ -194,6 +201,30 @@ def _append_key_actor_recall(
     state.key_actor_recall = {**state.key_actor_recall, actor_id: prev[-max_snippets:]}
 
 
+def _compact_actor_memory_if_needed(
+    state: WorldState,
+    *,
+    actor_id: str,
+    max_items: int = 8,
+    soft_char_budget: int = 1200,
+) -> None:
+    arr = list(state.key_actor_recall.get(actor_id, []))
+    if len(arr) <= max_items and sum(len(x) for x in arr) <= soft_char_budget:
+        return
+    keep_n = max(4, max_items // 2)
+    old = arr[:-keep_n] if len(arr) > keep_n else []
+    keep = arr[-keep_n:]
+    if old:
+        prior = state.key_actor_memory_rollups.get(actor_id, "")
+        merged = (prior + "\n" if prior else "") + "；".join(x.strip() for x in old if x.strip())
+        state.key_actor_memory_rollups = {
+            **state.key_actor_memory_rollups,
+            actor_id: merged[-2200:],
+        }
+        state.log(f"[记忆压缩] {actor_id} 旧表态已归档，后续由记忆摘要接力。")
+    state.key_actor_recall = {**state.key_actor_recall, actor_id: keep}
+
+
 def _maybe_media_detail(state: WorldState, agent_id: str, eff: dict[str, Any]) -> None:
     slant = eff.get("media_slant")
     hf = eff.get("headline_fragment")
@@ -206,6 +237,279 @@ def _maybe_media_detail(state: WorldState, agent_id: str, eff: dict[str, Any]) -
         state.push_detail("media_favorable", f"正面报道 · {agent_id}", text, {"slant": slant})
     else:
         state.push_detail("media_neutral", f"中性报道 · {agent_id}", text, {"slant": slant or "neutral"})
+
+
+def _append_timeline_uncertainty(state: WorldState, window: int = 6) -> None:
+    hist = list(state.metrics_history or [])
+    if not hist:
+        return
+    keys = ["sentiment", "policy_support", "unrest", "rumor_level", "issuer_trust_proxy"]
+    row: dict[str, Any] = {
+        "tick": state.tick,
+        "window": int(window),
+        "var": {},
+        "std": {},
+        "skew": {},
+        "kurt_excess": {},
+        "cv": {},
+        "variance_decomposition": {},
+    }
+    tail = hist[-window:]
+    for k in keys:
+        vals = [float(x.get(k)) for x in tail if isinstance(x, dict) and isinstance(x.get(k), (int, float))]
+        if len(vals) >= 3:
+            mean = float(statistics.mean(vals))
+            var = float(statistics.pvariance(vals))
+            std = float(math.sqrt(var))
+            row["var"][k] = var
+            row["std"][k] = std
+            if std > 1e-12:
+                m3 = float(statistics.mean([(v - mean) ** 3 for v in vals]))
+                m4 = float(statistics.mean([(v - mean) ** 4 for v in vals]))
+                row["skew"][k] = float(m3 / (std**3))
+                row["kurt_excess"][k] = float(m4 / (std**4) - 3.0)
+                row["cv"][k] = float(std / abs(mean)) if abs(mean) > 1e-12 else 0.0
+            else:
+                row["skew"][k] = 0.0
+                row["kurt_excess"][k] = 0.0
+                row["cv"][k] = 0.0
+        elif len(vals) >= 2:
+            row["var"][k] = float(statistics.pvariance(vals))
+            row["std"][k] = float(statistics.pstdev(vals))
+            row["skew"][k] = 0.0
+            row["kurt_excess"][k] = 0.0
+            row["cv"][k] = 0.0
+        else:
+            row["var"][k] = 0.0
+            row["std"][k] = 0.0
+            row["skew"][k] = 0.0
+            row["kurt_excess"][k] = 0.0
+            row["cv"][k] = 0.0
+
+    # variance decomposition: cov(y_i, f) / var(f), where y_i are cumulative attributed contributions.
+    tick_end = int(state.tick)
+    tick_start = tick_end - int(window) + 1
+    if len(hist) >= int(window):
+        ticks = list(range(tick_start, tick_end + 1))
+        x_rows = tail
+        metric_start_values: dict[str, float] = {}
+        for mk in keys:
+            metric_vals = [
+                float(r.get(mk))
+                for r in x_rows
+                if isinstance(r, dict) and mk in r and isinstance(r.get(mk), (int, float))
+            ]
+            if len(metric_vals) == len(x_rows):
+                metric_start_values[mk] = metric_vals[0]
+
+        attribution_tail = [
+            e
+            for e in getattr(state, "attribution_log", []) or []
+            if int(e.get("tick", -1)) in ticks and isinstance(e.get("deltas"), dict)
+        ]
+
+        for mk in keys:
+            if mk not in metric_start_values:
+                continue
+            f: list[float] = []
+            for r in x_rows:
+                v = r.get(mk)
+                if isinstance(v, (int, float)):
+                    f.append(float(v) - metric_start_values[mk])
+            if len(f) != len(x_rows) or len(f) < 3:
+                continue
+            mean_f = float(statistics.mean(f))
+            var_f = float(statistics.pvariance(f))
+            if var_f <= 1e-12:
+                row["variance_decomposition"][mk] = {"var_total": var_f, "components": []}
+                continue
+
+            comp_delta: dict[str, list[float]] = {}
+            for e in attribution_tail:
+                d = e.get("deltas") or {}
+                if mk not in d:
+                    continue
+                t = int(e.get("tick", -1))
+                idx = t - tick_start
+                if idx < 0 or idx >= len(f):
+                    continue
+                comp_id = f"{e.get('layer','')}/{e.get('component','')}"
+                comp_delta.setdefault(comp_id, [0.0] * len(f))[idx] += float(d.get(mk) or 0.0)
+
+            comp_y: dict[str, list[float]] = {}
+            for cid, del_arr in comp_delta.items():
+                y = []
+                csum = 0.0
+                for dv in del_arr:
+                    csum += float(dv)
+                    y.append(csum)
+                comp_y[cid] = y
+
+            sum_y = [0.0] * len(f)
+            for y in comp_y.values():
+                for i in range(len(f)):
+                    sum_y[i] += float(y[i])
+            residual = [float(f[i] - sum_y[i]) for i in range(len(f))]
+            comp_y["__residual__"] = residual
+
+            shares: list[dict[str, Any]] = []
+            for cid, y in comp_y.items():
+                mean_y = float(statistics.mean(y))
+                cov = float(statistics.mean([(y[i] - mean_y) * (f[i] - mean_f) for i in range(len(f))]))
+                share = float(cov / var_f)
+                shares.append({"id": cid, "share": share})
+
+            max_keep = 14
+            shares_sorted = sorted(shares, key=lambda x: abs(float(x.get("share") or 0.0)), reverse=True)
+            keep = shares_sorted[:max_keep]
+            drop = shares_sorted[max_keep:]
+            other_share = sum(float(x.get("share") or 0.0) for x in drop)
+            if abs(other_share) > 1e-12:
+                keep.append({"id": "__other_components__", "share": float(other_share)})
+            row["variance_decomposition"][mk] = {"var_total": var_f, "components": keep}
+    state.timeline_uncertainty.append(row)
+    state.timeline_uncertainty = state.timeline_uncertainty[-400:]
+
+
+def _append_audit_chain(state: WorldState, *, tick: int) -> None:
+    prev = (state.audit_chain[-1].get("hash") if state.audit_chain else "") or ""
+    payload = {
+        "tick": int(tick),
+        "metrics": state.snapshot_metrics(),
+        "narrative_tail": list(state.narrative[-6:]),
+        "attribution_tail": [e for e in state.attribution_log if int(e.get("tick", -1)) == int(tick)][-12:],
+        "prev_hash": prev,
+    }
+    ser = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    h = hashlib.sha256(ser.encode("utf-8")).hexdigest()
+    entry: dict[str, Any] = {"tick": int(tick), "hash": h, "prev_hash": prev}
+    secret = (os.environ.get("PEOPLE_AUDIT_SECRET") or "").strip()
+    if secret:
+        msg = f"{tick}|{h}|{prev}".encode("utf-8")
+        sig = hmac.new(secret.encode("utf-8"), msg, digestmod=hashlib.sha256).hexdigest()
+        entry["sig"] = sig
+    state.audit_chain.append(entry)
+    state.audit_chain = state.audit_chain[-2000:]
+
+
+def _update_layered_diffusion_proxy(state: WorldState, tick_details: list[dict[str, Any]]) -> None:
+    base = dict(state.diffusion_layer_state or {})
+    layers = {
+        "online_social": float(base.get("online_social", 0.0)),
+        "mainstream_media": float(base.get("mainstream_media", 0.0)),
+        "offline_community": float(base.get("offline_community", 0.0)),
+        "institutional_channel": float(base.get("institutional_channel", 0.0)),
+    }
+    for e in tick_details:
+        kind = str(e.get("kind") or "")
+        if "media_" in kind:
+            layers["mainstream_media"] += 0.06
+        elif kind in ("inter_agent_dialogue", "resolution_digest", "risk_milestone"):
+            layers["institutional_channel"] += 0.05
+        elif kind in ("cooperation_quote", "institution_pulse"):
+            layers["offline_community"] += 0.04
+        else:
+            layers["online_social"] += 0.03
+    # couple with macro rumor/activation proxy and decay.
+    social_push = max(0.0, float(state.rumor_level)) * 0.12
+    layers["online_social"] += social_push
+    for k in list(layers.keys()):
+        layers[k] = max(0.0, min(1.0, layers[k] * 0.92))
+    state.diffusion_layer_state = layers
+
+
+def _maybe_start_reg_investigations(state: WorldState, scenario: Scenario) -> None:
+    """
+    在高风险态势下启动简化版监管调查状态机（演练用，非真实监管流程）。
+    触发条件：产品/政策演练中，谣言与动荡指标持续偏高且当前无进行中的调查。
+    """
+    # 仅在还有后续 tick 且为政策/产品情境时考虑启动
+    if scenario.exercise_type not in ("policy", "product"):
+        return
+    # 若已有未结案调查，则不重复立案，只交给状态机推进
+    open_exist = any(
+        inv.get("status") in {"initiated", "pre_check", "in_depth", "rectification"}
+        for inv in state.investigations or []
+    )
+    if open_exist:
+        return
+    # 简单触发规则：rumor_level 与 unrest 同时偏高，视为「可能触发监管关注」的 proxy
+    rumor = float(state.rumor_level)
+    unrest = float(state.unrest)
+    support = float(state.policy_support)
+    issuer_trust = float(state.issuer_trust_proxy)
+    risk_score = max(rumor, unrest) * 0.6 + (1.0 - issuer_trust) * 0.25 + (0.4 - support) * 0.15
+    if risk_score < 0.55:
+        return
+    severity = "high" if risk_score >= 0.8 else "medium"
+    inv_id = str(uuid.uuid4())
+    entry = {
+        "id": inv_id,
+        "trigger_decision_id": None,
+        "status": "initiated",
+        "severity": severity,
+        "findings": [],
+        "next_deadline_tick": int(state.tick) + 1,
+        "created_tick": int(state.tick),
+    }
+    state.investigations.append(entry)
+    state.push_detail(
+        "reg_investigation_start",
+        "监管部门启动合规调查（演练）",
+        f"因谣言/动荡与信任 proxy 同时偏高，监管方在沙盘中启动一轮合规调查；当前风险级别：{severity}。",
+        {
+            "investigation_id": inv_id,
+            "status": "initiated",
+            "severity": severity,
+            "trigger_kind": "macro_risk_proxy",
+        },
+    )
+
+
+def _advance_reg_investigations(state: WorldState) -> None:
+    """
+    推进监管调查状态机阶段，并写入 detail_events。
+
+    状态流转：
+      initiated → pre_check → in_depth → rectification → closed
+    """
+    if not state.investigations:
+        return
+    phases = ["initiated", "pre_check", "in_depth", "rectification", "closed"]
+    for inv in state.investigations:
+        status = str(inv.get("status") or "")
+        if status == "closed":
+            continue
+        due = int(inv.get("next_deadline_tick", state.tick + 1))
+        if int(state.tick) < due:
+            continue
+        try:
+            idx = phases.index(status)
+        except ValueError:
+            idx = 0
+        if idx + 1 < len(phases):
+            new_status = phases[idx + 1]
+        else:
+            new_status = "closed"
+        inv["status"] = new_status
+        inv["next_deadline_tick"] = int(state.tick) + (2 if new_status in {"in_depth", "rectification"} else 0)
+        meta = {
+            "investigation_id": inv.get("id"),
+            "status": new_status,
+            "severity": inv.get("severity"),
+            "created_tick": inv.get("created_tick"),
+            "next_deadline_tick": inv.get("next_deadline_tick"),
+        }
+        title = "监管调查进度更新"
+        if new_status == "pre_check":
+            body = "监管内部对本次投诉与线索进行形式审查与分办，尚未进入实地深查阶段。"
+        elif new_status == "in_depth":
+            body = "监管已进入实质性核查阶段，涉及取证、部门问询与多轮书面反馈；沙盘中后续 tick 将视为在调查阴影下运行。"
+        elif new_status == "rectification":
+            body = "监管初步形成整改要求，要求发行方/地方条线在限定时间内提交整改方案与回执，具体结论尚待评估。"
+        else:
+            body = "本轮监管调查在沙盘中视为阶段性结束；部分发现可能在记忆与决策层中长期保留影响。"
+        state.push_detail("reg_investigation_progress", title, body, meta)
 
 
 def _normalize_resume_plans(resume: dict[str, Any]) -> list[str]:
@@ -377,6 +681,7 @@ def run_single_simulation(
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
     resume: dict[str, Any] | None = None,
     internal_plan_commit: dict[str, Any] | None = None,
+    pop_black_swan_events: Callable[[], list[dict[str, Any]]] | None = None,
 ) -> tuple[WorldState, dict[str, Any] | None]:
     """
     返回 (终态或暂停态, 暂停包)。
@@ -388,6 +693,37 @@ def run_single_simulation(
             progress_callback(payload)
 
     pause_package: dict[str, Any] | None = None
+    runtime_manual_pause_reason: str | None = None
+
+    def _apply_runtime_black_swans(source: str) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        nonlocal runtime_manual_pause_reason
+        if not pop_black_swan_events:
+            return out
+        for ev in pop_black_swan_events():
+            if str(ev.get("_control") or "") == "pause":
+                runtime_manual_pause_reason = str(ev.get("reason") or "").strip()[:300] or None
+                state.log("[手动暂停请求] 已接收，将在当前/下一轮安全点暂停等待新的处置输入。")
+                continue
+            d = apply_black_swan_event(state, ev, source=source)
+            if d:
+                record_attribution(
+                    state,
+                    layer="intervention",
+                    component="black_swan",
+                    tick=state.tick,
+                    deltas=d,
+                    meta={"title": ev.get("title"), "preset_id": ev.get("preset_id"), "source": source},
+                )
+            out.append(
+                {
+                    "title": ev.get("title"),
+                    "preset_id": ev.get("preset_id"),
+                    "severity": ev.get("severity"),
+                    "deltas": d,
+                }
+            )
+        return out
 
     if resume:
         rng = resume["rng"]
@@ -412,6 +748,9 @@ def run_single_simulation(
                     "exercise_type": scenario.exercise_type,
                 }
             )
+            injected = _apply_runtime_black_swans("resume_gate")
+            if injected:
+                _emit({"phase": "black_swan_injected", "tick": state.tick, "events": injected})
             sel = resume.get("selected_plan_index")
             si: int | None = None
             if sel is not None:
@@ -539,6 +878,21 @@ def run_single_simulation(
                     "desk_verdict_cn": (desk.get("desk_verdict_cn") or "")[:600]
                     if isinstance(desk, dict)
                     else "",
+                    "safety_score": (
+                        desk.get("safety_score")
+                        if isinstance(desk, dict) and desk.get("safety_score") is not None
+                        else (digest.get("safety_score") if isinstance(digest, dict) else None)
+                    ),
+                    "safety_summary": (
+                        (desk.get("safety_summary") or "")[:600]
+                        if isinstance(desk, dict)
+                        else ((digest.get("safety_summary") or "")[:600] if isinstance(digest, dict) else "")
+                    ),
+                    "risk_items": (
+                        desk.get("risk_items")
+                        if isinstance(desk, dict) and isinstance(desk.get("risk_items"), list)
+                        else (digest.get("risk_items") if isinstance(digest, dict) and isinstance(digest.get("risk_items"), list) else [])
+                    ),
                     "why_not_feasible": wnf,
                     "caveat": (desk.get("caveat") or "")[:500] if isinstance(desk, dict) else "",
                 }
@@ -565,6 +919,9 @@ def run_single_simulation(
                             "tick": state.tick,
                             "desk_verdict": desk.get("desk_verdict"),
                             "desk_verdict_cn": (desk.get("desk_verdict_cn") or "")[:500],
+                            "safety_score": desk.get("safety_score"),
+                            "safety_summary": (desk.get("safety_summary") or "")[:300],
+                            "risk_items": (desk.get("risk_items") or [])[:6],
                             "why_not_feasible": wnf,
                             "social_linkage": (desk.get("social_linkage") or "")[:400],
                             "caveat": (desk.get("caveat") or "")[:400],
@@ -598,6 +955,32 @@ def run_single_simulation(
         from people.regional_grounding import apply_regional_grounding, regional_grounding_artifact_dict
 
         scenario, rg_trace, rg_web = apply_regional_grounding(scenario, cfg)
+        # materialize causal skeleton (if provided) into executable rules/edges
+        try:
+            cl = scenario.extensions.causal
+            if getattr(cl, "skeleton", None):
+                rules, edges, info = materialize_causal_layer_from_skeleton(cl.skeleton)  # type: ignore[arg-type]
+                scenario = scenario.model_copy(
+                    update={
+                        "extensions": scenario.extensions.model_copy(
+                            update={
+                                "causal": scenario.extensions.causal.model_copy(
+                                    update={"rules": rules, "edges": edges}
+                                )
+                            }
+                        )
+                    }
+                )
+                # best-effort: keep a trace for debugging/export
+                try:
+                    scenario.extensions.causal.skeleton = {**dict(cl.skeleton or {}), "_materialized": info}  # type: ignore[assignment]
+                except Exception:
+                    pass
+        except Exception:
+            # 若骨架无效：宁可继续跑（等同未启用 skeleton），避免影响既有场景；
+            # 具体错误会在 causal_consistency / 上层校验中呈现。
+            pass
+
         rng = random.Random(seed)
         state = build_initial_state(scenario, rng)
         state.regional_grounding_trace = list(rg_trace)
@@ -620,12 +1003,14 @@ def run_single_simulation(
             if p:
                 d = internal_plan_commit.get("evaluation_digest")
                 k = internal_plan_commit.get("evaluation_desk")
+                dk = internal_plan_commit.get("decision_kind")
                 apply_confirmed_internal_plan(
                     state,
                     scenario,
                     plain=p,
                     digest=d if isinstance(d, dict) else {},
                     desk=k if isinstance(k, dict) else {},
+                    decision_kind=str(dk or "general"),
                 )
 
         pb = (scenario.player_brief or "").strip()
@@ -661,6 +1046,33 @@ def run_single_simulation(
 
     for _ in range(ticks_left):
         state.tick += 1
+        injected = _apply_runtime_black_swans("runtime")
+        if injected:
+            _emit({"phase": "black_swan_injected", "tick": state.tick, "events": injected})
+        if runtime_manual_pause_reason is not None and state.tick < scenario.ticks:
+            state.simulation_outcome = "paused"
+            state.log("[待指挥台处置] 运行中手动暂停，等待输入新决策后续跑。")
+            extra = (
+                f"暂停理由：{runtime_manual_pause_reason}\n\n"
+                if runtime_manual_pause_reason
+                else ""
+            )
+            pause_package = {
+                "scenario_dict": scenario.model_dump(),
+                "state_dict": state.model_dump(),
+                "rng_state": rng.getstate(),
+                "pause_kind": "manual_pause",
+                "crisis_id": "__manual_pause__",
+                "crisis_title": "手动暂停（等待新增输入）",
+                "crisis_detail": (
+                    extra
+                    + "已在运行中按请求暂停。请补充新的决策输入后继续推演；续跑会继承此前政策/运行态势，并叠加本次新增决策。"
+                ),
+                "risk_inventory": None,
+                "seed": seed,
+                "experiment_manifest": _experiment_manifest_for_run(scenario, seed, cfg),
+            }
+            return state, pause_package
         from people.internal_plan_commit import fire_due_internal_commitments
 
         internal_ms = fire_due_internal_commitments(state, scenario)
@@ -747,11 +1159,34 @@ def run_single_simulation(
             if isinstance(st, str):
                 if st.strip():
                     _append_key_actor_recall(state, agent.id, st)
+                    _compact_actor_memory_if_needed(state, actor_id=agent.id)
                 statements.append(f"{agent.id}: {st}")
             preview = (st[:220] + "…") if isinstance(st, str) and len(st) > 220 else (st if isinstance(st, str) else "")
             _maybe_media_detail(state, agent.id, eff if isinstance(eff, dict) else {})
             slant = eff.get("media_slant") if isinstance(eff, dict) else None
             hf = eff.get("headline_fragment") if isinstance(eff, dict) else None
+            # 关键智能体本轮博弈动作（主体视角事件）
+            try:
+                impact_keys = []
+                for key in ("sentiment_delta", "policy_support_delta", "rumor_delta", "unrest_delta"):
+                    if isinstance(eff, dict) and isinstance(eff.get(key), (int, float)):
+                        impact_keys.append(key.replace("_delta", ""))
+                state.push_detail(
+                    "actor_action",
+                    f"{agent.role or agent.id}",
+                    (st[:260] if isinstance(st, str) else "") or "本轮有动作（详见叙事与归因）。",
+                    {
+                        "actor_id": agent.id,
+                        "actor_role": agent.role,
+                        "categories": list(agent.categories),
+                        "phase": "decide",
+                        "channel": "primary_llm",
+                        "impact_metrics": impact_keys,
+                    },
+                )
+            except Exception:
+                # 不因博弈视图失败影响主流程
+                pass
             tick_memory_entries.append(
                 {
                     "agent_id": agent.id,
@@ -968,8 +1403,59 @@ def run_single_simulation(
                 state.horizon_forecast = {}
 
         _append_synthetic_details(state, scenario, rng)
-
         tick_details = [e for e in state.detail_events if e.get("tick") == state.tick]
+        # 监管调查状态机：基于当前态势尝试新立案，并推进既有调查阶段
+        try:
+            _maybe_start_reg_investigations(state, scenario)
+            _advance_reg_investigations(state)
+        except Exception:
+            # 不因监管调查视图失败影响主流程
+            pass
+        _append_timeline_uncertainty(state)
+        _append_audit_chain(state, tick=state.tick)
+        _update_layered_diffusion_proxy(state, tick_details)
+        # causal identifiability (v0): periodic windowed checks, stored on state for audit/report
+        try:
+            cl = scenario.extensions.causal
+            if cl.enabled and list(getattr(cl, "edges", []) or []) and state.tick % 3 == 0:
+                rep = assess_edges_identifiability(
+                    metrics_history=list(state.metrics_history or []),
+                    edges=[e.model_dump() if hasattr(e, "model_dump") else dict(e) for e in (cl.edges or [])],
+                    window=18,
+                )
+                state.causal_identifiability.append({"tick": state.tick, **rep})
+                state.causal_identifiability = state.causal_identifiability[-120:]
+        except Exception:
+            pass
+        # 多主体博弈视图用的轻量级时间线摘要（只带当 tick 的关键主体事件）
+        actor_timelines_tick: list[dict[str, Any]] = []
+        for e in tick_details:
+            kind = str(e.get("kind") or "")
+            if kind not in ("actor_action", "inter_agent_dialogue", "reg_investigation_start", "reg_investigation_progress", "competition_action"):
+                continue
+            meta = e.get("meta") or {}
+            actor_timelines_tick.append(
+                {
+                    "tick": state.tick,
+                    "kind": kind,
+                    "title": e.get("title"),
+                    "body": e.get("body"),
+                    "meta": meta,
+                }
+            )
+
+        ongoing_investigations = [
+            {
+                "id": inv.get("id"),
+                "status": inv.get("status"),
+                "severity": inv.get("severity"),
+                "next_deadline_tick": inv.get("next_deadline_tick"),
+                "created_tick": inv.get("created_tick"),
+            }
+            for inv in (state.investigations or [])
+            if inv.get("status") != "closed"
+        ]
+
         tick_end_payload: dict[str, Any] = {
             "phase": "tick_end",
             "tick": state.tick,
@@ -984,12 +1470,105 @@ def run_single_simulation(
             ],
             "kpi_by_tier": dict(state.kpi_by_tier),
             "tick_wall_seconds": round(time.perf_counter() - tick_wall_start, 4),
+            "timeline_uncertainty": (state.timeline_uncertainty[-1] if state.timeline_uncertainty else {}),
+            "audit_hash": (state.audit_chain[-1].get("hash") if state.audit_chain else ""),
+            "diffusion_layers": dict(state.diffusion_layer_state or {}),
+            "actor_timelines_tick": actor_timelines_tick,
+            "investigations": ongoing_investigations,
         }
         if scenario.decision_support.enabled:
             ds_hints = build_tick_decision_hints(state, scenario)
             if ds_hints:
                 tick_end_payload["decision_support"] = ds_hints
         _emit(tick_end_payload)
+
+        # 概率触发的「内部问题」：强调现实治理摩擦，并为用户创造决策介入点（非自动通关）。
+        ii = scenario.internal_issues
+        can_fire_internal_issue = (
+            bool(ii.enabled)
+            and state.tick < scenario.ticks
+            and (state.tick - int(getattr(state, "internal_issue_last_tick", 0))) > int(ii.cooldown_ticks)
+        )
+        if can_fire_internal_issue:
+            scope = str(getattr(ii, "sampling_scope", "auto") or "auto")
+            if scope == "policy":
+                p_issue = ii.probability_policy_per_tick
+                issue_ex = "policy"
+                issue_arc = "large_group"
+            elif scope == "enterprise":
+                p_issue = ii.probability_enterprise_per_tick
+                issue_ex = "product"
+                issue_arc = "large_group"
+            elif scope == "startup":
+                p_issue = ii.probability_startup_per_tick
+                issue_ex = "product"
+                issue_arc = "startup"
+            elif scope == "shop":
+                p_issue = ii.probability_shop_per_tick
+                issue_ex = "product"
+                issue_arc = "sme"
+            elif scenario.exercise_type == "policy":
+                p_issue = ii.probability_policy_per_tick
+                issue_ex = scenario.exercise_type
+                issue_arc = getattr(scenario.issuer, "archetype", "large_group")
+            else:
+                arc = getattr(scenario.issuer, "archetype", "large_group")
+                if arc == "startup":
+                    p_issue = ii.probability_startup_per_tick
+                elif arc == "sme":
+                    p_issue = ii.probability_shop_per_tick
+                else:
+                    p_issue = ii.probability_enterprise_per_tick
+                issue_ex = scenario.exercise_type
+                issue_arc = arc
+            pid = maybe_pick_internal_issue_preset(
+                exercise_type=issue_ex,
+                issuer_archetype=issue_arc,
+                rng=rng,
+                probability=float(p_issue),
+            )
+            if pid:
+                ev = build_black_swan_event(preset_id=pid, severity=1.0)
+                d_issue = apply_black_swan_event(state, ev, source="internal_probabilistic")
+                state.internal_issue_last_tick = state.tick
+                record_attribution(
+                    state,
+                    layer="intervention",
+                    component="internal_issue_probabilistic",
+                    tick=state.tick,
+                    deltas=d_issue,
+                    meta={"preset_id": pid},
+                )
+                _emit(
+                    {
+                        "phase": "black_swan_injected",
+                        "tick": state.tick,
+                        "events": [
+                            {
+                                "title": ev.get("title"),
+                                "preset_id": ev.get("preset_id"),
+                                "severity": ev.get("severity"),
+                                "deltas": d_issue,
+                            }
+                        ],
+                    }
+                )
+                if ii.trigger_pause:
+                    state.simulation_outcome = "paused"
+                    state.log(f"[待指挥台处置] 内部问题触发：{ev.get('title')}")
+                    pause_package = {
+                        "scenario_dict": scenario.model_dump(),
+                        "state_dict": state.model_dump(),
+                        "rng_state": rng.getstate(),
+                        "pause_kind": "internal_issue",
+                        "crisis_id": f"__internal_issue__{pid}",
+                        "crisis_title": f"内部问题触发（概率事件）· {ev.get('title')}",
+                        "crisis_detail": str(ev.get("detail") or "内部治理风险已触发，请给出处置方案后续跑。"),
+                        "risk_inventory": None,
+                        "seed": seed,
+                        "experiment_manifest": _experiment_manifest_for_run(scenario, seed, cfg),
+                    }
+                    return state, pause_package
 
         crisis = pick_crisis(scenario, state)
         # 仅在「后面还有 tick」时暂停，否则续跑无迭代空间

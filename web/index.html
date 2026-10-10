@@ -1,391 +1,411 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- 默认后端地址；仅当 API 不在 127.0.0.1:8770 时再改 content -->
   <meta name="people-api-origin" content="http://127.0.0.1:8770" />
-  <title>people — 社会与市场反响演练</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
-  <style>
-    :root {
-      --bg: #0f1419;
-      --card: #1a2332;
-      --text: #e7ecf3;
-      --muted: #8b9cb3;
-      --accent: #3d8bfd;
-      --ok: #3ecf8e;
-      --err: #f7768e;
-      --net-bg1: #0d1118;
-      --net-bg2: #151c28;
-      --net-glow: rgba(61, 139, 253, 0.12);
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 1.25rem;
-      line-height: 1.5;
-      max-width: 1420px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    h1 { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.25rem 0; }
-    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem; }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-    .card {
-      background: var(--card);
-      border-radius: 10px;
-      padding: 1rem 1.1rem;
-      border: 1px solid #2a3544;
-    }
-    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
-    input, select, textarea {
-      width: 100%;
-      padding: 0.5rem 0.65rem;
-      border-radius: 6px;
-      border: 1px solid #3d4d63;
-      background: #121a24;
-      color: var(--text);
-      font-size: 0.9rem;
-    }
-    textarea { min-height: 70px; resize: vertical; font-family: inherit; }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 0.65rem 1.4rem;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    .row { margin-bottom: 0.85rem; }
-    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 0.75rem; }
-    .metrics { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.75rem; }
-    .pill {
-      background: #121a24;
-      padding: 0.35rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      border: 1px solid #2a3544;
-    }
-    #narrative {
-      max-height: 420px;
-      overflow: auto;
-      font-size: 0.82rem;
-      white-space: pre-wrap;
-      background: #121a24;
-      padding: 0.75rem;
-      border-radius: 8px;
-      border: 1px solid #2a3544;
-    }
-    .error { color: var(--err); white-space: pre-wrap; font-size: 0.85rem; }
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid #fff4;
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: sp 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-    @keyframes sp { to { transform: rotate(360deg); } }
-    canvas { max-height: 300px; }
-    #chartExt { max-height: 280px; }
-    #ensembleChart { max-height: 300px; }
-    #liveDetail {
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-top: 0.5rem;
-      min-height: 1.25rem;
-      word-break: break-word;
-    }
-    #financeSnapshot {
-      margin-top: 0.55rem;
-      padding: 0.55rem 0.65rem;
-      border-radius: 8px;
-      border: 1px solid #2e4a6e;
-      background: linear-gradient(135deg, #141c28 0%, #162030 100%);
-      font-size: 0.86rem;
-      line-height: 1.5;
-    }
-    #financeSnapshot .fs-muted { color: var(--muted); font-size: 0.8rem; }
-    #financeSnapshot .fs-row { display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: baseline; }
-    #financeSnapshot .fs-item strong { color: #94e2d5; font-weight: 600; margin-right: 0.35rem; }
-    #financeSnapshot .fs-item span.val { color: var(--text); font-variant-numeric: tabular-nums; }
-    #chartFinance { max-height: 260px; }
-    .stack { display: flex; flex-direction: column; gap: 1rem; }
-    .horizon-wrap { display: grid; gap: 0.65rem; }
-    .hz strong { color: var(--accent); font-size: 0.82rem; display: block; margin-bottom: 0.2rem; }
-    .hz p { margin: 0; font-size: 0.82rem; color: var(--text); line-height: 1.45; }
-    .detail-wrap { max-height: 340px; overflow: auto; font-size: 0.8rem; }
-    .detail-item {
-      border-left: 3px solid var(--accent);
-      padding: 0.4rem 0.55rem;
-      margin-bottom: 0.45rem;
-      background: #121a24;
-      border-radius: 4px;
-    }
-    .detail-item.unfav { border-left-color: var(--err); }
-    .detail-item .dt { color: var(--muted); font-size: 0.72rem; margin-bottom: 0.15rem; }
-    .net-panel {
-      border-radius: 12px;
-      border: 1px solid #2e3f56;
-      background:
-        radial-gradient(ellipse 120% 80% at 50% 0%, var(--net-glow) 0%, transparent 55%),
-        linear-gradient(165deg, var(--net-bg1) 0%, var(--net-bg2) 100%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.35);
-      overflow: hidden;
-    }
-    .net-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.65rem;
-      border-bottom: 1px solid #2a354488;
-      background: rgba(0,0,0,0.2);
-    }
-    .net-toolbar button {
-      padding: 0.4rem 0.75rem;
-      font-size: 0.78rem;
-      font-weight: 600;
-    }
-    .net-toolbar .net-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.65rem;
-      margin-left: auto;
-      font-size: 0.72rem;
-      color: var(--muted);
-    }
-    .net-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
-    .net-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #fff3; }
-    #interactionGraph {
-      height: min(520px, 58vh);
-      min-height: 380px;
-      background: transparent;
-    }
-    #riskBoard { margin-top: 0.55rem; font-size: 0.82rem; color: #cfd8e6; }
-    .ensemble-panel .row2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr;
-      gap: 0.5rem;
-    }
-    @media (max-width: 900px) { .ensemble-panel .row2 { grid-template-columns: 1fr 1fr; } }
-    .ensemble-panel input[type="number"] { width: 100%; }
-    #ensembleSummary {
-      font-size: 0.78rem;
-      color: #b8c5d6;
-      background: #121a24;
-      border: 1px solid #2a3544;
-      border-radius: 8px;
-      padding: 0.65rem;
-      margin-top: 0.65rem;
-      max-height: 200px;
-      overflow: auto;
-      white-space: pre-wrap;
-    }
-    .risk-bad { color: var(--err); }
-    .risk-warn { color: #e0af68; }
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 100;
-      display: none; align-items: center; justify-content: center; padding: 1rem;
-    }
-    .modal-backdrop.show { display: flex; }
-    .modal-box {
-      background: var(--card); border-radius: 12px; max-width: 540px; width: 100%;
-      padding: 1.2rem 1.35rem; border: 1px solid #3d4d63;
-      position: relative;
-    }
-    .modal-box.wide { max-width: 720px; }
-    .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem; }
-    .modal-head h3 { flex: 1; margin: 0; font-size: 1.05rem; }
-    .history-pick label { font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 0.2rem; }
-    .history-pick select { font-size: 0.8rem; max-width: 12rem; }
-    .modal-box h3 { margin: 0 0 0.5rem 0; font-size: 1.05rem; }
-    button.btn-secondary { background: #3d4d63; }
-    button.btn-secondary:hover { filter: brightness(1.08); }
-    .eval-strip {
-      font-size: 0.82rem; background: #121a24; border: 1px solid #2a3544; border-radius: 8px;
-      padding: 0.65rem 0.75rem; margin: 0.5rem 0 0.75rem 0; max-height: 220px; overflow: auto;
-    }
-    .eval-strip .pe-plan { margin-bottom: 0.65rem; padding-bottom: 0.55rem; border-bottom: 1px solid #2a3544; }
-    .eval-strip .pe-plan:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .btn-row { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-top: 0.5rem; }
-    .dl-card {
-      background: #121a24; border: 1px solid #2e3d52; border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.75rem;
-    }
-    .dl-card pre { margin: 0.35rem 0 0 0; font-size: 0.78rem; white-space: pre-wrap; color: #b8c5d6; max-height: 200px; overflow: auto; }
-    .modal-box .crisis-body { color: var(--text); font-size: 0.88rem; margin-bottom: 0.85rem; white-space: pre-wrap; }
-    .modal-actions { margin-top: 0.75rem; }
-    .wizard-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
-      display: none; align-items: center; justify-content: center; padding: 1rem;
-    }
-    .wizard-backdrop.show { display: flex; }
-    .wizard-box {
-      background: var(--card); border-radius: 12px; max-width: 680px; width: 100%;
-      max-height: 92vh; overflow: auto; padding: 1.15rem 1.3rem; border: 1px solid #3d4d63;
-    }
-    .wizard-box h2 { margin: 0 0 0.35rem 0; font-size: 1.15rem; }
-    .wiz-intro { font-size: 0.86rem; color: var(--muted); margin-bottom: 0.85rem; line-height: 1.55; }
-    .wiz-steps { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
-    .wiz-steps span {
-      font-size: 0.72rem; padding: 0.2rem 0.45rem; border-radius: 4px; background: #121a24; color: var(--muted);
-      border: 1px solid #2a3544;
-    }
-    .wiz-steps span.on { color: var(--accent); border-color: var(--accent); }
-    fieldset.wiz-fs { border: 1px solid #2e3d52; border-radius: 8px; margin: 0 0 0.75rem 0; padding: 0.65rem 0.75rem; }
-    fieldset.wiz-fs legend { font-size: 0.82rem; color: var(--accent); padding: 0 0.35rem; }
-    .wiz-presets { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.65rem; }
-    .wiz-presets button { font-size: 0.82rem; padding: 0.45rem 0.65rem; }
-    .wiz-hint { font-size: 0.78rem; color: var(--muted); margin: 0.25rem 0 0.4rem 0; line-height: 1.45; }
-    .wiz-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    @media (max-width: 560px) { .wiz-row2 { grid-template-columns: 1fr; } }
-    label.chk-bind {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.45rem;
-      font-size: 0.78rem;
-      color: var(--muted);
-      line-height: 1.45;
-      cursor: pointer;
-    }
-    label.chk-bind input { width: auto; margin-top: 0.2rem; flex-shrink: 0; }
-    #liveLog {
-      margin-top: 0.65rem;
-      max-height: 260px;
-      overflow: auto;
-      font-size: 0.75rem;
-      font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-      background: #121a24;
-      padding: 0.55rem 0.65rem;
-      border-radius: 8px;
-      border: 1px solid #2a3544;
-      white-space: pre-wrap;
-      color: #b8c5d6;
-    }
-  </style>
+  <title>people | Decision workspace</title>
+  <meta name="theme-color" content="#f6f3ee" />
+  <script src="/people/assets/translations.js" defer></script>
+  <script src="/people/assets/i18n.js" defer></script>
+  <script src="/people/assets/chart.umd.min.js"></script>
+  <script src="/people/assets/vis-network.min.js"></script>
+  <script>
+    window.__marriageMusicBase = "/marriage";
+  </script>
+  <link rel="preload" href="/people/assets/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/people/assets/design.css" />
+  <script src="/people/assets/workspace.js" defer></script>
 </head>
-<body>
-  <h1>people 演练台</h1>
-  <p class="sub">流式展示 tick、媒体报道倾向、机构与合作报价、账面/财力与时间线展望（今天→月→年，态势好可见 2～3 年）。遇 YAML 配置的危机点会<strong>暂停</strong>，须由你输入处置方案后再续跑，引擎不会自动替你「解决」。<strong>不必手写 YAML</strong>也可改「政策/企业/创业」设定：点下方<strong>场景配置向导</strong>。</p>
-
+<body class="workspace">
+  <a class="skip-link" href="#workspace-main">Skip to workspace</a>
+  <div id="modePickerBackdrop" class="mode-backdrop" aria-hidden="true">
+    <div class="mode-box">
+      <h2 style="margin:0 0 0.45rem 0;">Choose your workspace</h2>
+      <p class="hint" style="margin:0 0 0.75rem 0;">
+        Professional mode provides full controls. Guided mode offers scenario descriptions, sliders, and an event timeline. Both use the same simulation engine. See 系统说明.md, section 8.2, for details.
+      </p>
+      <div class="mode-grid">
+        <div class="mode-item">
+          <h3>Professional</h3>
+          <p>Full parameters, crisis response, decision assessment, extreme events, and Monte Carlo analysis for analysts and researchers.</p>
+          <button type="button" id="pickProfessionalMode">Open professional mode</button>
+        </div>
+        <div class="mode-item">
+          <h3>Guided mode</h3>
+          <p>Describe a scenario, review suggested departments, and start a simulation with simplified controls.</p>
+          <button type="button" id="pickPublicMode">Open guided mode</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <header class="site-header">
+    <a class="wordmark" href="/" aria-label="people home">people<span>Decision simulation</span></a>
+    <div class="language-switch" role="group" aria-label="Language / 语言"><button type="button" data-language="en" aria-pressed="true" aria-label="English">EN</button><button type="button" data-language="zh" aria-pressed="false" aria-label="中文">中文</button></div>
+    <nav class="site-nav" aria-label="Workspace navigation">
+      <a class="desktop-link" href="/">Home</a>
+      <button class="nav-entry btn-secondary" type="button" id="headerWizardBtn">Scenario guide <span class="arrow" aria-hidden="true">↗</span></button>
+    </nav>
+  </header>
+  <div class="workspace-shell">
+    <aside class="workspace-sidebar" aria-label="Workspace sections">
+      <p class="sidebar-caption">DECISION WORKSPACE</p>
+      <nav class="sidebar-nav">
+        <a href="#simulation-section" aria-current="true"><span aria-hidden="true">01</span>Scenario & run</a>
+        <a href="#decision-section"><span aria-hidden="true">02</span>Decision review</a>
+        <a href="#status-panel"><span aria-hidden="true">03</span>Live indicators</a>
+        <a href="#network-section"><span aria-hidden="true">04</span>Actor network</a>
+        <a href="#narrative-section"><span aria-hidden="true">05</span>Narrative log</a>
+        <a href="#distribution-section"><span aria-hidden="true">06</span>Outcome distribution</a>
+      </nav>
+      <div class="sidebar-note">Start with context. Observe each round.<br />Pause at critical moments.<br />Then reassess your next move.</div>
+    </aside>
+    <main class="workspace-main" id="workspace-main">
+      <section class="workspace-intro">
+        <div><p class="eyebrow">PEOPLE / DECISION WORKSPACE</p><h1>Rehearse the next move.</h1><p>Set the context. Observe responses. Reassess as conditions change.</p></div>
+        <div class="workspace-mode" role="group" aria-label="Workspace mode">
+          <button type="button" data-mode="professional" aria-pressed="true">Professional</button>
+          <button type="button" data-mode="public" aria-pressed="false">Guided mode</button>
+        </div>
+      </section>
+      <nav class="mobile-jump" aria-label="Jump to a workspace section">
+        <a href="#simulation-section">Scenario setup</a><a href="#decision-section">Decision review</a><a href="#status-panel">Live overview</a><a href="#network-section">Actor network</a>
+      </nav>
   <div class="stack">
-  <div class="card">
-    <label>指挥台决策层（确认后的方案会长期注入机关/公司内部上下文）</label>
+  <div class="card" id="publicModePanel" style="display:none;">
+    <label>Guided scenario / startups & local businesses</label>
+    <p class="hint">
+      Describe a real scenario to identify its type and relevant departments. Drag event cards into the timeline to add them to the brief. Guided and professional modes share the same engine.
+    </p>
+    <div class="row">
+      <label for="publicSceneText">What would you like to rehearse?</label>
+      <textarea id="publicSceneText" rows="4" placeholder="For example: we plan to launch an affordable service locally, but are concerned about quality perceptions and market disruption."></textarea>
+    </div>
+    <div class="row">
+      <label for="publicDecisionText">Add a decision (subsequent rounds retain earlier effects)</label>
+      <textarea id="publicDecisionText" rows="2" placeholder="For example: launch a small pilot, expand customer support by 20%, and review after two weeks."></textarea>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" id="publicInjectDecisionBtn">Add to simulation</button>
+        <button type="button" class="btn-secondary" id="publicDecisionEvaluateBtn">Assess decision</button>
+        <button type="button" class="btn-secondary" id="publicDecisionConfirmBtn">Confirm & continue</button>
+        <span id="publicDecisionHint" class="hint"></span>
+      </div>
+      <pre id="publicDecisionEvalBox" style="display:none;margin-top:0.45rem;font-size:0.78rem;white-space:pre-wrap;background:#f5f0e8;padding:0.55rem;border-radius:6px;border:1px solid #e1dbd2;color:#706b65;max-height:180px;overflow:auto;"></pre>
+    </div>
+    <div class="row">
+      <label>Inject an extreme event during a run or pause</label>
+      <p class="hint" style="margin: 0 0 0.35rem 0">
+        Select Custom event to enter a title and description. The selection is shared across guided and professional modes.
+      </p>
+      <div class="btn-row">
+        <select id="publicQuickSwanPreset" aria-label="Extreme event preset" style="max-width:260px;"></select>
+        <button type="button" class="btn-secondary" id="publicInjectSwanBtn">Inject event</button>
+        <span id="publicSwanHint" class="hint"></span>
+      </div>
+    </div>
+    <div class="row">
+      <button type="button" class="btn-secondary" id="publicInferBtn">Identify scenario & departments</button>
+      <span id="publicInferHint" class="hint" style="margin-left:0.5rem;"></span>
+    </div>
+    <div class="row">
+      <label for="publicPressure">Pressure intensity</label>
+      <input id="publicPressure" type="range" min="1" max="10" value="5" />
+    </div>
+    <div class="row">
+      <label for="publicPace">Simulation pace</label>
+      <input id="publicPace" type="range" min="1" max="10" value="5" />
+    </div>
+    <div class="row">
+      <label for="publicScenePreset">base template</label>
+      <select id="publicScenePreset">
+        <option value="default.yaml">General policy</option>
+        <option value="policy_county_example.yaml">County policy</option>
+        <option value="product_launch.yaml">Enterprise product</option>
+        <option value="startup_example.yaml">Startup</option>
+        <option value="regional_hotpot_chengdu.yaml">Local business</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Departments to include in this round</label>
+      <div id="publicDeptChecks" class="dept-checks"></div>
+    </div>
+    <div class="story-grid">
+      <div class="story-col">
+        <h4>Event cards (drag into the timeline)</h4>
+        <fieldset class="event-target"><legend>Add events to</legend><div class="event-target-options"><button type="button" data-event-target="t0_24h" aria-pressed="true">0–24 hours</button><button type="button" data-event-target="t2_7d" aria-pressed="false">2–7 days</button><button type="button" data-event-target="t1_4w" aria-pressed="false">1–4 weeks</button><button type="button" data-event-target="t1_3m" aria-pressed="false">1–3 months</button></div><p class="hint">Choose a time period, then tap an event to add it. You can also drag an event into the timeline.</p><span class="hint" id="timelineAddStatus" role="status" aria-live="polite"></span></fieldset>
+        <div id="eventBank" class="event-bank"></div>
+        <p class="hint" style="margin-top:0.4rem;">Add a card more than once if needed. Select a timeline chip to remove it.</p>
+      </div>
+      <div class="story-col">
+        <h4>Scenario timeline</h4>
+        <div class="timeline-lane" data-lane="t0_24h">
+          <div class="lane-title">0-24 hours / containment</div>
+          <div class="lane-items"></div>
+        </div>
+        <div class="timeline-lane" data-lane="t2_7d">
+          <div class="lane-title">2-7 days / stabilization</div>
+          <div class="lane-items"></div>
+        </div>
+        <div class="timeline-lane" data-lane="t1_4w">
+          <div class="lane-title">1-4 weeks / recovery</div>
+          <div class="lane-items"></div>
+        </div>
+        <div class="timeline-lane" data-lane="t1_3m">
+          <div class="lane-title">1-3 months / structural improvement</div>
+          <div class="lane-items"></div>
+        </div>
+      </div>
+    </div>
+    <pre id="publicInferenceBox" style="display:none;white-space:pre-wrap;background:#f5f0e8;padding:0.55rem;border-radius:6px;border:1px solid #e1dbd2;color:#706b65;"></pre>
+    <div class="btn-row" style="flex-wrap: wrap; align-items: center">
+      <button type="button" id="publicApplyBtn">Apply to this run</button>
+      <button type="button" id="publicRunBtn">Apply & run</button>
+      <button type="button" class="btn-secondary" id="publicGuideBtn">Quick guide</button>
+      <button type="button" class="btn-secondary" id="publicExportHtmlBtn">Export HTML report</button>
+      <button type="button" class="btn-secondary" id="publicExportPdfBtn">Export PDF / print</button>
+      <button type="button" class="btn-secondary" id="publicRequestPauseBtn" style="display: none">Request pause</button>
+      <button type="button" class="btn-secondary" id="publicStopStreamBtn" style="display: none">Stop stream</button>
+      <button type="button" class="btn-secondary" id="publicEvalBtn">Quick decision assessment</button>
+      <button type="button" class="btn-secondary" id="publicSpecialLaunchBtn">Launch assessment</button>
+      <button type="button" class="btn-secondary" id="publicSpecialMnaBtn">M&A; assessment</button>
+      <button type="button" class="btn-secondary" id="publicHistoryBtn">Decision history</button>
+      <button type="button" class="btn-secondary" id="switchToProfessionalBtn">Switch to professional</button>
+    </div>
+    <div class="row" style="margin-top:0.55rem;">
+      <label>Specialized assessment results</label>
+      <div id="specialCardsWrap" style="display:none;">
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:0.55rem;">
+          <div class="card" style="padding:0.7rem;">
+            <div style="font-size:0.8rem;color:#8a6441;">M&A; assessment</div>
+            <div id="mnaCardBox" style="font-size:0.82rem;white-space:pre-wrap;"></div>
+          </div>
+          <div class="card" style="padding:0.7rem;">
+            <div style="font-size:0.8rem;color:#8a6441;">Launch assessment</div>
+            <div id="launchCardBox" style="font-size:0.82rem;white-space:pre-wrap;"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:0.55rem;padding:0.7rem;">
+          <div style="font-size:0.8rem;color:#8a6441;margin-bottom:0.35rem;">Department conflict matrix</div>
+          <div id="conflictMatrixBox" style="overflow:auto;"></div>
+        </div>
+      </div>
+      <p id="specialHint" class="hint">Run a launch or M&A; assessment to display the results here.</p>
+    </div>
+  </div>
+  <div id="publicHistoryBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>Decision history / guided mode</h3>
+      </div>
+      <div id="publicHistoryBody" class="crisis-body"></div>
+      <div class="modal-actions btn-row">
+        <button type="button" id="publicHistoryCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+  <div id="swanManualBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-box" style="max-width: 520px">
+      <div class="modal-head">
+        <h3>Custom extreme event</h3>
+      </div>
+      <p class="hint" style="margin: 0 0 0.65rem 0">
+        A title is required. Confirm to synchronize the custom event across all preset selectors. Choosing a library preset clears the custom entry.
+      </p>
+      <label for="swanManualTitle">Event title</label>
+      <input
+        id="swanManualTitle"
+        type="text"
+        style="width: 100%; box-sizing: border-box; margin: 0.25rem 0 0.5rem"
+        placeholder="For example: a critical supplier stops delivery, or a regulatory position changes abruptly."
+      />
+      <label for="swanManualDetail">Event description (optional)</label>
+      <textarea id="swanManualDetail" rows="3" style="width: 100%; box-sizing: border-box; margin: 0.25rem 0 0.5rem"></textarea>
+      <label for="swanManualSeverity">Severity (0.1-3)</label>
+      <input id="swanManualSeverity" type="number" min="0.1" max="3" step="0.1" value="1" style="width: 6rem; margin: 0.25rem 0 0.75rem" />
+      <div class="modal-actions btn-row">
+        <button type="button" id="swanManualConfirmBtn">Confirm</button>
+        <button type="button" class="btn-secondary" id="swanManualCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div id="publicGuideBackdrop" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-box" style="max-width: 620px">
+      <div class="modal-head">
+        <h3>Guided mode / quick guide</h3>
+      </div>
+      <p id="publicGuideTitle" style="margin: 0.25rem 0 0.45rem 0; font-weight: 600"></p>
+      <p id="publicGuideDesc" class="hint" style="margin: 0 0 0.65rem 0; color: #706b65"></p>
+      <div class="btn-row">
+        <button type="button" class="btn-secondary" id="publicGuidePrevBtn">Previous</button>
+        <button type="button" id="publicGuideActBtn">Apply this step</button>
+        <button type="button" id="publicGuideNextBtn">Next</button>
+        <button type="button" class="btn-secondary" id="publicGuideCloseBtn">Close</button>
+      </div>
+      <p id="publicGuideProgress" class="hint" style="margin: 0.65rem 0 0 0"></p>
+    </div>
+  </div>
+  <div class="card" id="decision-section">
+    <h2 class="panel-title">Decision review</h2>
+    <p class="section-context">Assess a proposal, then confirm it for subsequent rounds.</p>
     <p class="hint" style="margin:0 0 0.5rem 0;">
-      <strong>内部「仅评估」可随时点击</strong>（含<strong>流式运行中</strong>）：独立请求、不中断主演练、不推进 tick。默认按左侧底稿 + 指挥台要点；若已暂停且勾选「绑定 checkpoint」，则纳入该快照态势。评估会<strong>综合</strong>场景与可用快照（资金/财力/债务、人力与政治资本、宏观与 cohort、叙事、记忆、决策层指令、地区情境、机构与合作等），再输出专业转化 + 桌面研判及资源粗估。页面上<strong>账面现金 / 负债</strong>以沙盘记账数值为主（演练用 proxy）；请在 YAML 的 <code>operational_finance</code> 写明真实体量对应的初值，未写且仍为模板默认时引擎会按发主体量档位生成写意初值，便于叙事自洽。
+      <strong>Use the decision field below</strong>. Select Evaluate decision to assess <strong>the current proposal</strong> without advancing a round. Assessments use the scenario and brief, plus the paused snapshot when checkpoint binding is enabled. Relevant context includes resources, debt, staffing, public indicators, narrative, memory, local conditions, and partnerships. Displayed finances are simulation proxies; specify real scale in the template's <code>operational_finance</code> section.
     </p>
     <div id="decisionLayerActive" class="dl-card" style="display:none;"></div>
-    <div id="decisionLayerActivePlaceholder" class="hint" style="margin:0 0 0.5rem 0;">尚未确认方案：待桌面研判并点「确认继续演练」后，此处显示已固化指令摘要。</div>
-    <label for="decisionLayerDraft">草案（不自动推进 tick）</label>
-    <textarea id="decisionLayerDraft" rows="3" placeholder="例：声明加大研发力度，优先上线××功能；约束条件…"></textarea>
+    <div id="decisionLayerActivePlaceholder" class="hint" style="margin:0 0 0.5rem 0;">No proposal confirmed yet. Assess and confirm a decision to see the instruction summary here.</div>
+    <label for="decisionLayerDraft">Decision proposal (does not advance the simulation)</label>
+    <textarea id="decisionLayerDraft" rows="3" placeholder="For example: allocate additional resources, protect the launch schedule, and define constraints and responsibilities."></textarea>
     <label class="chk-bind" style="margin-top:0.45rem;">
       <input type="checkbox" id="decisionEvalBindCkpt" />
-      <span>评估时绑定当前 checkpoint 态势（<strong>须当前页已有暂停快照</strong>；服务重启后快照会失效，请取消勾选。勾选后纳入当时舆情/账面；<strong>默认不勾选</strong>＝仅用左侧底稿 + 指挥台要点）</span>
+      <span>Bind assessment to the current checkpoint (<strong>requires a paused snapshot on this page</strong>; deselect after a server restart. Binding includes sentiment and finances from that snapshot; <strong>disabled by default</strong>, using only the scenario and brief)</span>
     </label>
     <div class="btn-row" style="margin-top:0.5rem;">
-      <button type="button" class="btn-secondary" id="decisionEvalOnlyBtn">仅评估本草案（内部）</button>
+      <button type="button" class="btn-secondary" id="decisionEvalOnlyBtn">Evaluate decision</button>
     </div>
-    <pre id="decisionEvalResult" style="display:none;margin-top:0.5rem;font-size:0.78rem;white-space:pre-wrap;background:#121a24;padding:0.55rem;border-radius:6px;border:1px solid #2a3544;color:#b8c5d6;max-height:240px;overflow:auto;"></pre>
+    <pre id="decisionEvalResult" style="display:none;margin-top:0.5rem;font-size:0.78rem;white-space:pre-wrap;background:#f5f0e8;padding:0.55rem;border-radius:6px;border:1px solid #e1dbd2;color:#706b65;max-height:240px;overflow:auto;"></pre>
     <div id="decisionEvalFollowup" style="display:none;margin-top:0.5rem;">
-      <p id="evalCommitmentHint" class="hint" style="margin:0 0 0.4rem 0;color:#a8b4c4;"></p>
+      <p id="evalCommitmentHint" class="hint" style="margin:0 0 0.4rem 0;color:#706b65;"></p>
       <div class="btn-row">
-        <button type="button" class="btn-secondary" id="decisionConfirmExecBtn">确认执行本方案</button>
-        <button type="button" class="btn-secondary" id="decisionDiscardEvalBtn">不采纳，另写一套</button>
+        <button type="button" class="btn-secondary" id="decisionConfirmExecBtn">Confirm this proposal</button>
+        <button type="button" class="btn-secondary" id="decisionDiscardEvalBtn">Discard & write another</button>
       </div>
-      <label for="draftPlanCandidateSelect" style="margin-top:0.5rem;display:block;">候选草案（多次评估会累积，选中可载入上方文本框）</label>
-      <select id="draftPlanCandidateSelect" style="width:100%;max-width:480px;margin-top:0.25rem;padding:0.35rem;border-radius:6px;background:#121a24;border:1px solid #2a3544;color:#e7ecf3;">
-        <option value="">— 选一套载入 —</option>
+      <label for="draftPlanCandidateSelect" style="margin-top:0.5rem;display:block;">Candidate proposals (select to load an earlier assessment)</label>
+      <select id="draftPlanCandidateSelect" style="width:100%;max-width:480px;margin-top:0.25rem;padding:0.35rem;border-radius:6px;background:#f5f0e8;border:1px solid #e1dbd2;color:#203652;">
+        <option value="">Select a proposal</option>
       </select>
     </div>
   </div>
-  <div class="grid">
-    <div class="card">
+  <div class="grid" id="simulation-section">
+    <div class="card" id="configuration-panel">
+      <div class="panel-heading"><h2>Scenario setup</h2><span>GROUNDED IN CONTEXT</span></div>
       <div class="row">
-        <label for="scenario">场景文件（scenarios/*.yaml）</label>
+        <label for="scenario">Scenario template</label>
         <select id="scenario"></select>
       </div>
+      <details class="connection-settings row">
+        <summary>Models, connection & random seed</summary>
       <div class="row">
-        <label for="seed">随机种子</label>
+        <label for="seed">Random seed</label>
         <input type="number" id="seed" value="42" />
       </div>
       <div class="row">
-        <label for="primary">PRIMARY 模型（如 deepseek-reasoner）</label>
-        <input type="text" id="primary" placeholder="留空则用环境变量 PEOPLE_MODEL_PRIMARY" />
+        <label for="primary">Primary model (e.g. deepseek-reasoner)</label>
+        <input type="text" id="primary" placeholder="Leave blank to use PEOPLE_MODEL_PRIMARY" />
       </div>
       <div class="row">
-        <label for="fast">FAST 模型（如 deepseek-chat）</label>
-        <input type="text" id="fast" placeholder="留空则用 PEOPLE_MODEL_FAST" />
+        <label for="fast">Fast model (e.g. deepseek-chat)</label>
+        <input type="text" id="fast" placeholder="Leave blank to use PEOPLE_MODEL_FAST" />
       </div>
       <div class="row">
-        <label for="key">OpenAI 兼容 API Key（可选，填了会覆盖本次请求的环境变量）</label>
-        <input type="password" id="key" autocomplete="off" placeholder="DeepSeek 时与 OPENAI_API_KEY 相同" />
+        <label for="key">OpenAI-compatible API key (optional; overrides the environment for this request)</label>
+        <input type="password" id="key" autocomplete="off" placeholder="For DeepSeek, use the same key as OPENAI_API_KEY" />
       </div>
       <div class="row">
         <label for="base">Base URL（DeepSeek: https://api.deepseek.com/v1）</label>
-        <input type="text" id="base" placeholder="留空则用环境变量；无环境变量且模型含 deepseek 时会自动用 DeepSeek 端点" />
+        <input type="text" id="base" placeholder="Leave blank to use the environment; DeepSeek models use the DeepSeek endpoint when no URL is configured" />
       </div>
       <p class="hint" style="margin-top:-0.35rem;">
-        仅用 DeepSeek 时：建议填写上项 Base URL；若留空，请保证 PRIMARY/FAST（或环境变量里的模型名）含 <code>deepseek</code>，否则请求会默认打到 <code>api.openai.com</code> 导致密钥无效。
+        For DeepSeek, set the Base URL above. Otherwise, ensure the primary or fast model name contains <code>deepseek</code>; without it, requests default to <code>api.openai.com</code> and the key may be rejected.
       </p>
+      </details>
       <div class="row">
-        <label for="brief">指挥台要点 player_brief（可选，与向导里「要点」同步）</label>
-        <textarea id="brief" placeholder="不填则使用 YAML 内原文。向导可一键填入范例。"></textarea>
+        <label for="brief">Simulation brief (optional; shared with the scenario guide)</label>
+        <textarea id="brief" placeholder="Leave blank to use the template brief, or apply an example in the scenario guide."></textarea>
       </div>
+      <details class="row" style="margin-top:0.4rem;">
+        <summary style="cursor:pointer;color:#8a6441;">Advanced: internal issues & external research</summary>
+        <div style="margin-top:0.5rem;border:1px solid #e1dbd2;border-radius:8px;padding:0.6rem;background:#f5f0e8;">
+          <label class="chk-bind"><input type="checkbox" id="iiEnabled" checked /><span>Enable probabilistic internal issues (not triggered every round)</span></label>
+          <label class="chk-bind"><input type="checkbox" id="iiTriggerPause" checked /><span>Pause on an issue and require a response before continuing</span></label>
+          <div class="wiz-row2" style="margin-top:0.4rem;">
+            <div><label for="iiCooldown">Cooldown (rounds)</label><input id="iiCooldown" type="number" min="0" max="20" value="2" /></div>
+            <div>
+              <label for="iiScope">Issue scope</label>
+              <select id="iiScope">
+                <option value="auto">Automatic (based on the scenario)</option>
+                <option value="policy">Government issues only</option>
+                <option value="enterprise">Enterprise issues only</option>
+                <option value="startup">Startup issues only</option>
+                <option value="shop">Local business issues only</option>
+              </select>
+            </div>
+          </div>
+          <div class="wiz-row2" style="margin-top:0.35rem;">
+            <div><label for="iiProbPolicy">Government probability (0-1)</label><input id="iiProbPolicy" type="number" min="0" max="1" step="0.01" value="0.09" /></div>
+            <div><label for="iiProbEnterprise">Enterprise probability (0-1)</label><input id="iiProbEnterprise" type="number" min="0" max="1" step="0.01" value="0.08" /></div>
+          </div>
+          <div class="wiz-row2" style="margin-top:0.35rem;">
+            <div><label for="iiProbStartup">Startup probability (0-1)</label><input id="iiProbStartup" type="number" min="0" max="1" step="0.01" value="0.11" /></div>
+            <div><label for="iiProbShop">Local business probability (0-1)</label><input id="iiProbShop" type="number" min="0" max="1" step="0.01" value="0.12" /></div>
+          </div>
+          <div style="margin-top:0.5rem;">
+            <label class="chk-bind"><input type="checkbox" id="planSearchEnabled" /><span>Use external research in assessments (policy, markets, and local context)</span></label>
+            <div class="wiz-row2" style="margin-top:0.35rem;">
+              <div>
+                <label for="planSearchFocus">Research focus</label>
+                <select id="planSearchFocus">
+                  <option value="general">General</option>
+                  <option value="new_product_launch">Product launch</option>
+                  <option value="acquisition_mna">Mergers & acquisitions</option>
+                  <option value="store_expansion">Store expansion</option>
+                  <option value="policy_rollout">Policy implementation</option>
+                  <option value="competitor_patent_scan">Competitor & patent research</option>
+                  <option value="local_store_scan">Local store reputation research</option>
+                </select>
+              </div>
+              <div>
+                <label for="planSearchProvider">Research provider</label>
+                <select id="planSearchProvider">
+                  <option value="">Automatic</option>
+                  <option value="duckduckgo">DuckDuckGo</option>
+                  <option value="brave">Brave</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
       <div class="btn-row" style="margin-bottom:0.65rem;">
-        <button type="button" class="btn-secondary" id="openWizardBtn">场景配置向导</button>
-        <span class="hint" style="margin:0;" id="wizardStatusHint">未应用向导覆盖（使用 YAML 原样 + 上框要点）。</span>
+        <button type="button" class="btn-secondary" id="openWizardBtn">Scenario guide</button>
+        <span class="hint" style="margin:0;" id="wizardStatusHint">Using the original template and your brief. No guide overrides applied.</span>
       </div>
-      <div class="btn-row" style="align-items:center;">
-        <button type="button" id="runBtn">开始运行</button>
-        <button type="button" id="stopStreamBtn" class="btn-secondary" style="display:none;">停止运行</button>
+      <div class="btn-row run-actions" style="align-items:center;">
+        <button type="button" id="runBtn">Run simulation</button>
+        <button type="button" id="stopStreamBtn" class="btn-secondary" style="display:none;">Stop stream</button>
+        <button type="button" id="requestPauseBtn" class="btn-secondary" style="display:none;">Pause & add a decision</button>
       </div>
-      <p class="hint">流式运行时可点「停止运行」断开浏览器连接（后端可能仍会收尾片刻；未暂停则无新 checkpoint）。若未填 Key 且环境变量也无 Key，将使用 Dry-Run 占位输出。</p>
+      <p class="hint">Pause at a safe point to create a checkpoint, or stop the browser stream. Without an API key, the simulation uses placeholder Dry-Run output.</p>
     </div>
 
-    <div class="card">
-      <label>运行状态</label>
-      <p id="status">就绪</p>
-      <div id="liveDetail"></div>
-      <div id="financeSnapshot" class="fs-muted">尚未运行；启用财务后此处显示账面现金、财力池与债务。</div>
-      <pre id="liveLog" style="display:none;"></pre>
+    <div class="card is-empty" id="status-panel">
+      <div class="panel-heading"><h2>Live overview</h2><span>ROUND BY ROUND</span></div>
+      <p id="status">Ready to begin</p>
+      <div class="status-empty" id="status-empty"><span class="empty-symbol" aria-hidden="true">∿</span><strong>A new perspective starts here.</strong><p>Choose a scenario and begin. Indicators, financial changes, and actor responses will unfold here.</p></div>
+      <div id="financeSnapshot" class="fs-muted">Financial overview appears here when enabled: cash, fiscal resources, and debt.</div>
       <div id="headerInfo" class="metrics"></div>
       <div id="finalMetrics" class="metrics"></div>
       <div class="row" style="margin-top:1rem;">
-        <label>宏观指标随 tick（流式运行时每 tick 更新）</label>
+        <label class="chart-label">Core indicators (updated each round)</label>
         <canvas id="chart"></canvas>
       </div>
       <div class="row" style="margin-top:0.75rem;">
-        <label>扩展指标（KPI · 扩散 · 资源池等，有数据时显示）</label>
+        <label class="chart-label">Additional indicators (KPIs, diffusion, and resources; shown when available)</label>
         <canvas id="chartExt"></canvas>
       </div>
       <div class="row" id="chartFinanceRow" style="margin-top:0.75rem; display:none;">
-        <label>财务 proxy（百万 / 十亿；量纲与上图宏观 0～1 不同，单独展示）</label>
+        <label>Financial proxies (millions / billions; displayed separately from normalized indicators)</label>
         <canvas id="chartFinance"></canvas>
       </div>
+      <details class="runtime-diagnostics"><summary>Run diagnostics</summary><div id="liveDetail" data-no-translate></div><pre id="liveLog" style="display:none;" data-no-translate></pre></details>
     </div>
   </div>
 
-  <div class="card ensemble-panel">
-    <label>蒙特卡洛 / 终局分布（并行多次完整演练，非流式）</label>
-    <p class="hint" style="margin:0 0 0.5rem 0;">与左侧同场景、同 Key；结果含分位数与阈值命中估计。次数多时会占满 CPU，请酌情调 workers。</p>
+  <div class="card ensemble-panel" id="distribution-section">
+    <label>Outcome distribution / Monte Carlo</label>
+    <p class="hint" style="margin:0 0 0.5rem 0;">Uses the same scenario and API settings. Compare quantiles and threshold estimates across complete runs. Adjust workers to match available compute.</p>
     <div class="row2">
       <div>
-        <label for="ensRuns">并行次数 runs</label>
+        <label for="ensRuns">Simulation runs</label>
         <input type="number" id="ensRuns" value="12" min="1" max="256" />
       </div>
       <div>
@@ -393,186 +413,230 @@
         <input type="number" id="ensWorkers" value="4" min="1" max="64" />
       </div>
       <div>
-        <label for="ensThKey">阈值指标</label>
+        <label for="ensThKey">Threshold metric</label>
         <input type="text" id="ensThKey" value="policy_support" placeholder="policy_support" />
       </div>
       <div>
-        <label for="ensThVal">阈值</label>
+        <label for="ensThVal">Threshold value</label>
         <input type="number" id="ensThVal" value="0.55" step="0.01" />
       </div>
     </div>
     <div class="btn-row" style="margin-top:0.65rem;">
-      <button type="button" class="btn-secondary" id="ensembleBtn">估计终局分布</button>
+      <button type="button" class="btn-secondary" id="ensembleBtn">Estimate distribution</button>
       <span class="hint" style="margin:0;" id="ensembleHint"></span>
     </div>
     <pre id="ensembleSummary" style="display:none;"></pre>
     <div class="row" style="margin-top:0.75rem;">
-      <label>分位数对比（p10 / p50 / p90）</label>
+      <label>Quantile comparison (p10 / p50 / p90)</label>
       <canvas id="ensembleChart"></canvas>
     </div>
   </div>
 
   <div class="card">
-    <label>时间线展望（每 tick 末由快模型更新）</label>
-    <div id="horizonPanel" class="horizon-wrap"><p class="hint" style="margin:0;">运行后显示：今天～本周 / 约一月 / 约一年；若信任与支持度持续偏强，可出现两年、三年情景（非承诺）。</p></div>
+    <label>Time horizon outlook</label>
+    <div id="horizonPanel" class="horizon-wrap"><p class="hint" style="margin:0;">After a run: near-term, one-month, and one-year scenarios. Sustained trust and support may extend the outlook. These are scenarios, not commitments.</p></div>
   </div>
 
   <div class="card">
-    <label>运行细节（机构脉搏、合作报价与账面、媒体报道等）</label>
-    <div id="detailPanel" class="detail-wrap"><p class="hint" style="margin:0;">细节随 tick 追加；不利报道会标红边。</p></div>
+    <label>Responses & operational detail</label>
+    <div id="detailPanel" class="detail-wrap" role="region" tabindex="0" aria-label="Responses & operational detail"><p class="hint" style="margin:0;">Updates appear each round. Adverse reporting is marked with a red border.</p></div>
   </div>
 
   <div class="card">
-    <label>交流网络图（跨主体沟通；同向边已合并，线宽 ≈ 互动次数）</label>
+    <label>Multi-actor timeline (experimental)</label>
+    <p class="hint" style="margin:0 0 0.4rem 0;">
+      Explore actions and exchanges by actor and round to examine which participants may be driving changes.
+    </p>
+    <div class="game-head">
+      <label for="gameActorFilter">Filter actor</label>
+      <select id="gameActorFilter">
+        <option value="">All actors</option>
+      </select>
+    </div>
+    <div id="gameTimeline" class="game-timeline" role="region" tabindex="0" aria-label="Multi-actor timeline (experimental)">
+      <p class="hint" style="margin:0;">Actor actions will appear here by round after a simulation.</p>
+    </div>
+  </div>
+
+  <div class="card" id="network-section">
+    <label>Actor communication network</label>
     <div class="net-panel">
       <div class="net-toolbar">
-        <button type="button" class="btn-secondary" id="netFitBtn" title="缩放以容纳全部节点">适应画布</button>
-        <button type="button" class="btn-secondary" id="netStabBtn" title="重新力导向稳定">重新布局</button>
-        <button type="button" class="btn-secondary" id="netPhysicsBtn" title="暂停/继续物理引擎">物理：开</button>
+        <button type="button" class="btn-secondary" id="netFitBtn" title="Fit all nodes into the view">Fit to view</button>
+        <button type="button" class="btn-secondary" id="netStabBtn" title="Recalculate the network layout">Rearrange</button>
+        <button type="button" class="btn-secondary" id="netPhysicsBtn" title="Pause or resume network physics">Physics: on</button>
         <div class="net-legend" aria-hidden="true">
-          <span><i class="net-dot" style="background:#3d8bfd;"></i>机构/角色</span>
-          <span><i class="net-dot" style="background:#a855f7;"></i>公众/用户群</span>
-          <span><i class="net-dot" style="background:#f59e0b;"></i>监管</span>
-          <span><i class="net-dot" style="background:#22d3ee;"></i>政务·媒体</span>
-          <span><i class="net-dot" style="background:#84cc16;"></i>企业回应</span>
+          <span><i class="net-dot" style="background:#315c7c;"></i>Institutions / actors</span>
+          <span><i class="net-dot" style="background:#a99986;"></i>Public / users</span>
+          <span><i class="net-dot" style="background:#a47850;"></i>Regulators</span>
+          <span><i class="net-dot" style="background:#627d9d;"></i>Public affairs / media</span>
+          <span><i class="net-dot" style="background:#546779;"></i>Business response</span>
         </div>
       </div>
       <div id="interactionGraph"></div>
     </div>
-    <div id="riskBoard">等待运行中...</div>
+    <div id="riskBoard">Waiting for a simulation</div>
   </div>
 
-  <div class="card">
-    <label>叙事日志</label>
-    <div id="narrative"></div>
+  <div class="card" id="narrative-section">
+    <label>Narrative log</label>
+    <div id="narrative" data-no-translate role="region" tabindex="0" aria-label="Narrative log"></div>
     <pre id="errBox" class="error" style="display:none;margin-top:0.75rem;"></pre>
   </div>
   </div>
 
+    </main>
+  </div>
   <div id="crisisBackdrop" class="modal-backdrop" aria-hidden="true">
     <div class="modal-box wide">
       <div class="modal-head">
-        <h3 id="crisisTitle">危机 — 需指挥台处置</h3>
+        <h3 id="crisisTitle">Critical event / response required</h3>
         <div class="history-pick">
-          <label for="historyPlanPick">历史方案</label>
-          <select id="historyPlanPick" title="载入此前研判或改评前的方案全文">
-            <option value="">— 选择载入 —</option>
+          <label for="historyPlanPick">Previous proposals</label>
+          <select id="historyPlanPick" title="Load the full text of a previous or revised proposal">
+            <option value="">Select a previous proposal</option>
           </select>
         </div>
       </div>
       <div id="planEvalStrip" class="eval-strip" style="display:none;"></div>
       <details
         class="finance-patch"
-        style="margin: 0.4rem 0 0.6rem; border: 1px solid #2a3544; border-radius: 6px; padding: 0.35rem 0.55rem; background: #1a222d"
+        style="margin: 0.4rem 0 0.6rem; border: 1px solid #e1dbd2; border-radius: 6px; padding: 0.35rem 0.55rem; background: #faf7f2"
       >
-        <summary style="cursor: pointer; color: #8fafd4; font-size: 0.88rem">财务手工调账（改写 checkpoint 内现金/财力/债务）</summary>
-        <p class="hint" style="font-size: 0.78rem; margin: 0.35rem 0 0.4rem; color: #8b9cb3">
-          留空的项不改。提交后返回<strong>新 checkpoint</strong>，本页会自动切换；续跑与再次调账请用新 token。单位：现金/债务=百万 proxy，财力=十亿
-          proxy。
+        <summary style="cursor: pointer; color: #8a6441; font-size: 0.88rem">Adjust checkpoint finances</summary>
+        <p class="hint" style="font-size: 0.78rem; margin: 0.35rem 0 0.4rem; color: #706b65">
+          Blank fields remain unchanged. Submitting creates a <strong>new checkpoint</strong>. This page switches to the new token for future adjustments and continuation. Units: cash/debt in millions; fiscal resources in billions (proxies).
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center">
-          <label style="font-size: 0.8rem" for="financePatchCash">现金</label>
-          <input type="number" step="any" id="financePatchCash" placeholder="set 百万" style="width: 6.5rem" />
-          <label style="font-size: 0.8rem" for="financePatchFiscal">财力池</label>
-          <input type="number" step="any" id="financePatchFiscal" placeholder="set 十亿" style="width: 6.5rem" />
-          <label style="font-size: 0.8rem" for="financePatchDebt">债务本金</label>
-          <input type="number" step="any" id="financePatchDebt" placeholder="set 百万" style="width: 6.5rem" />
+          <label style="font-size: 0.8rem" for="financePatchCash">Cash</label>
+          <input type="number" step="any" id="financePatchCash" placeholder="Set millions" style="width: 6.5rem" />
+          <label style="font-size: 0.8rem" for="financePatchFiscal">Fiscal resources</label>
+          <input type="number" step="any" id="financePatchFiscal" placeholder="Set billions" style="width: 6.5rem" />
+          <label style="font-size: 0.8rem" for="financePatchDebt">Debt principal</label>
+          <input type="number" step="any" id="financePatchDebt" placeholder="Set millions" style="width: 6.5rem" />
         </div>
         <input
           type="text"
           id="financePatchNote"
-          placeholder="备注（写入叙事，如：补贴到账 / 税费返还）"
+          placeholder="Narrative note (e.g. subsidy received or tax refund)"
           style="width: 100%; margin-top: 0.35rem; box-sizing: border-box"
         />
-        <button type="button" id="financePatchApply" class="btn-secondary" style="margin-top: 0.35rem">应用调账</button>
+        <button type="button" id="financePatchApply" class="btn-secondary" style="margin-top: 0.35rem">Apply adjustment</button>
         <span id="financePatchStatus" class="hint" style="font-size: 0.78rem; margin-left: 0.5rem"></span>
       </details>
+      <details
+        class="finance-patch"
+        style="margin: 0.2rem 0 0.6rem; border: 1px solid #e1dbd2; border-radius: 6px; padding: 0.35rem 0.55rem; background: #faf7f2"
+      >
+        <summary style="cursor: pointer; color: #8a6441; font-size: 0.88rem">Extreme event at a checkpoint</summary>
+        <p class="hint" style="font-size: 0.78rem; margin: 0.35rem 0 0.4rem; color: #706b65">
+          Inject an extreme event at a paused checkpoint to create a new snapshot. Custom event entries are shared across all three preset selectors.
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center">
+          <label style="font-size: 0.8rem" for="blackSwanPreset">Preset</label>
+          <select id="blackSwanPreset" style="min-width: 13rem"></select>
+          <label style="font-size: 0.8rem" for="blackSwanSeverity">Severity</label>
+          <input type="number" min="0.1" max="3" step="0.1" id="blackSwanSeverity" value="1.0" style="width: 5rem" />
+        </div>
+        <input
+          type="text"
+          id="blackSwanTitle"
+          placeholder="Custom title (optional; defaults to the preset title)"
+          style="width: 100%; margin-top: 0.35rem; box-sizing: border-box"
+        />
+        <textarea
+          id="blackSwanDetail"
+          rows="2"
+          placeholder="Custom description (optional)"
+          style="width: 100%; margin-top: 0.35rem; box-sizing: border-box"
+        ></textarea>
+        <button type="button" id="blackSwanInjectPaused" class="btn-secondary" style="margin-top: 0.35rem">Inject at this checkpoint</button>
+        <span id="blackSwanStatus" class="hint" style="font-size: 0.78rem; margin-left: 0.5rem"></span>
+      </details>
       <div id="crisisDetail" class="crisis-body"></div>
-      <label id="crisisSolutionLabel" for="crisisSolution">处置方案（将写入叙事并进入后续各智能体上下文）</label>
-      <textarea id="crisisSolution" rows="6" placeholder="一套方案直接写；多套方案请用单独一行 --- 分隔每一段。"></textarea>
+      <label id="crisisSolutionLabel" for="crisisSolution">Response proposal (retained in the narrative and subsequent actor context)</label>
+      <textarea id="crisisSolution" rows="6" placeholder="Write one proposal directly. Separate multiple proposals with a line containing ---."></textarea>
       <p id="crisisMultiHint" class="hint" style="font-size:0.82rem;margin:0.35rem 0 0.5rem 0;">
-        流程：先提交 → 自动专业转化 + 桌面可行性 + <strong>阶段周期（演练估计）</strong> → 在下方确认或改评。多套方案将分别研判；默认需再点「确认继续」才进入下一 tick。
+        Submit for structured review and feasibility assessment, then <strong>estimated response periods</strong> . Confirm or revise below. Proposals are assessed separately; continuation requires confirmation.
       </p>
-      <label id="planPickLabel" for="planPick" style="display:none;margin-top:0.5rem">选用主执行线（写入决策层与叙事）</label>
+      <label id="planPickLabel" for="planPick" style="display:none;margin-top:0.5rem">Select the primary proposal to retain in decision context</label>
       <select id="planPick" style="display:none;width:100%;margin:0.25rem 0 0.5rem 0"></select>
       <div class="modal-actions btn-row" id="deskReviewBar" style="display:none;">
-        <button type="button" id="confirmProceedBtn" style="display:none">确认继续演练</button>
-        <button type="button" class="btn-secondary" id="reevalDeskBtn" style="display:none">评估另一套方案</button>
-        <button type="button" class="btn-secondary" id="modifyDeskBtn" style="display:none">修改并重评</button>
+        <button type="button" id="confirmProceedBtn" style="display:none">Confirm & continue</button>
+        <button type="button" class="btn-secondary" id="reevalDeskBtn" style="display:none">Assess another proposal</button>
+        <button type="button" class="btn-secondary" id="modifyDeskBtn" style="display:none">Revise & reassess</button>
       </div>
       <div class="modal-actions btn-row" id="crisisSubmitBar">
-        <button type="button" id="crisisSubmit">提交方案并研判</button>
+        <button type="button" id="crisisSubmit">Submit for review</button>
       </div>
     </div>
   </div>
 
   <div id="wizardBackdrop" class="wizard-backdrop" aria-hidden="true">
     <div class="wizard-box">
-      <h2 id="wizardTitle">场景配置向导</h2>
-      <p class="wiz-intro" id="wizardWelcome">
-        <strong>第一次用？</strong>不必先学 YAML：选好底稿文件后，用本向导填写<strong>政策机关</strong>或<strong>企业/创业</strong>情境与<strong>本轮要点</strong>。这些内容会<strong>仅在本次 HTTP 请求中合并</strong>进场景，<strong>不会改写</strong>磁盘上的 <code>.yaml</code>。高级人设、危机规则、cohort 权重等仍来自 YAML；要深度定制可继续直接改文件。
-      </p>
+      <h2 id="wizardTitle">Scenario guide</h2>
+      <p class="wiz-intro" id="wizardWelcome">Choose a template, then use this guide to set your institutional or business context and simulation brief. Changes apply only to this request; the original YAML file remains unchanged. Advanced personas, crisis rules, and cohort weights are defined in the template.</p>
       <div class="wiz-steps" id="wizardStepBar">
-        <span class="on">1 底稿</span><span>2 类型</span><span>3 情境</span><span>4 要点</span>
+        <span class="on">Template</span><span>Exercise</span><span>Context</span><span>Brief</span>
       </div>
-      <p class="wiz-hint" style="margin-top:0">也可先点<strong>预设</strong>再微调：</p>
+      <p class="wiz-hint" style="margin-top:0">Choose a preset, then refine the context:</p>
       <div class="wiz-presets">
-        <button type="button" class="btn-secondary" data-preset="policy_province">预设 · 省级政策</button>
-        <button type="button" class="btn-secondary" data-preset="policy_county">预设 · 县级执行</button>
-        <button type="button" class="btn-secondary" data-preset="product_group">预设 · 集团产品</button>
-        <button type="button" class="btn-secondary" data-preset="product_startup">预设 · 创业公司</button>
-        <button type="button" class="btn-secondary" data-preset="clear">清空向导字段</button>
+        <button type="button" class="btn-secondary" data-preset="policy_province">Provincial policy</button>
+        <button type="button" class="btn-secondary" data-preset="policy_county">County implementation</button>
+        <button type="button" class="btn-secondary" data-preset="product_group">Enterprise launch</button>
+        <button type="button" class="btn-secondary" data-preset="product_startup">Startup launch</button>
+        <button type="button" class="btn-secondary" data-preset="clear">Clear guide fields</button>
       </div>
       <fieldset class="wiz-fs">
-        <legend>1 · 场景底稿（YAML）</legend>
-        <p class="wiz-hint">下拉选择与主页一致的 <code>scenarios/*.yaml</code>。底稿决定智能体池、危机规则、随机种子以外的静态结构。</p>
-        <label for="wizScenarioSelect">底稿文件</label>
+        <legend>Scenario template</legend>
+        <p class="wiz-hint">Choose the same <code>scenarios/*.yaml</code>. The template defines actor pools, crisis rules, and other static settings.</p>
+        <label for="wizScenarioSelect">Template file</label>
         <select id="wizScenarioSelect"></select>
       </fieldset>
       <fieldset class="wiz-fs">
-        <legend>2 · 演练类型</legend>
-        <p class="wiz-hint"><strong>政策 policy</strong>：机关制定/沟通措施，侧重大众对政策与施政的反应。<strong>产品 product</strong>：企业发布产品或营销动作，侧重市场、渠道与舆情。</p>
-        <label for="wizExerciseType">覆盖为</label>
+        <legend>Exercise type</legend>
+        <p class="wiz-hint"><strong>Policy</strong>: public-sector proposals, focusing on public responses to policy and governance.<strong>Product</strong>: business launches and marketing, focusing on markets, channels, and sentiment.</p>
+        <label for="wizExerciseType">Override exercise type</label>
         <select id="wizExerciseType">
-          <option value="">（不覆盖，沿用 YAML）</option>
-          <option value="policy">policy · 政策制定者演练</option>
-          <option value="product">product · 产品/集团发行演练</option>
+          <option value="">Use the template setting</option>
+          <option value="policy">Policy simulation</option>
+          <option value="product">Product / enterprise simulation</option>
         </select>
       </fieldset>
       <fieldset class="wiz-fs" id="wizPolicyFields">
-        <legend>3a · 政策侧（policy_context）</legend>
-        <p class="wiz-hint">与 YAML 中 <code>policy_context</code> 同义；留空则沿用底稿原文。</p>
+        <legend>Government context</legend>
+        <p class="wiz-hint">Equivalent to the template's <code>policy_context</code> field. Leave blank to keep the original brief.</p>
         <div class="row">
-          <label for="wizAdminLevel">行政层级</label>
+          <label for="wizAdminLevel">Administrative level</label>
           <select id="wizAdminLevel">
-            <option value="">（不覆盖）</option>
+            <option value="">Use the template setting</option>
             <option value="unset">unset</option>
-            <option value="central">central · 中央/部委</option>
-            <option value="province">province · 省</option>
-            <option value="city">city · 市</option>
-            <option value="county">county · 县/区</option>
+            <option value="central">Central / ministerial</option>
+            <option value="province">Province</option>
+            <option value="city">City</option>
+            <option value="county">County / district</option>
           </select>
         </div>
         <div class="row">
-          <label for="wizJurisdiction">地名 jurisdiction_name</label>
-          <input id="wizJurisdiction" type="text" placeholder="例：某省 / 某市某区" />
+          <label for="wizJurisdiction">Jurisdiction</label>
+          <input id="wizJurisdiction" type="text" placeholder="For example: a province, city, or district" />
         </div>
         <div class="row">
-          <label for="wizLocalNorms">民风与社会 local_norms_brief</label>
-          <textarea id="wizLocalNorms" rows="2" placeholder="县域人情、短视频、业主群等"></textarea>
+          <label for="wizLocalNorms">Local norms & community context</label>
+          <textarea id="wizLocalNorms" rows="2" placeholder="Local relationships, short-form media, or community groups"></textarea>
         </div>
         <div class="row">
-          <label for="wizMediaEnv">媒体环境 media_environment_brief</label>
-          <textarea id="wizMediaEnv" rows="2" placeholder="省融媒、市场化财经媒体、自媒体断章等"></textarea>
+          <label for="wizMediaEnv">Media environment</label>
+          <textarea id="wizMediaEnv" rows="2" placeholder="Regional media, business press, or fragmented social commentary"></textarea>
         </div>
       </fieldset>
       <fieldset class="wiz-fs" id="wizProductFields">
-        <legend>3b · 企业侧（issuer）</legend>
-        <p class="wiz-hint"><code>megacorp</code> 国民级品牌；<code>large_group</code> 行业龙头；<code>sme</code> 中小企业；<code>startup</code> 创业团队（人少、现金紧、外包多）。</p>
+        <legend>Enterprise context</legend>
+        <p class="wiz-hint"><code>megacorp</code> Established national brand;<code>large_group</code> industry leader;<code>sme</code> small or medium enterprise;<code>startup</code> startup with limited staff, cash, and outsourced operations.</p>
         <div class="row">
-          <label for="wizArchetype">发行方类型 archetype</label>
+          <label for="wizArchetype">Organization type</label>
           <select id="wizArchetype">
-            <option value="">（不覆盖）</option>
+            <option value="">Use the template setting</option>
             <option value="megacorp">megacorp</option>
             <option value="large_group">large_group</option>
             <option value="sme">sme</option>
@@ -580,54 +644,79 @@
           </select>
         </div>
         <div class="row">
-          <label for="wizBrandEquity">品牌资产 brand_equity（0～1）</label>
-          <input id="wizBrandEquity" type="number" min="0" max="1" step="0.05" placeholder="留空不覆盖" />
+          <label for="wizBrandEquity">Brand equity (0-1)</label>
+          <input id="wizBrandEquity" type="number" min="0" max="1" step="0.05" placeholder="Leave blank to use the template" />
         </div>
         <div class="row">
-          <label for="wizReputation">声誉叙事 reputation_brief</label>
-          <textarea id="wizReputation" rows="2" placeholder="近期待改善或信任积累等"></textarea>
+          <label for="wizReputation">Reputation context</label>
+          <textarea id="wizReputation" rows="2" placeholder="Recent controversies or accumulated trust"></textarea>
         </div>
         <div class="row">
-          <label for="wizSupplyChain">供应链 supply_chain_position</label>
-          <input id="wizSupplyChain" type="text" placeholder="关键件对外依存、产能等" />
+          <label for="wizSupplyChain">Supply chain position</label>
+          <input id="wizSupplyChain" type="text" placeholder="Critical component dependencies, capacity, and delivery constraints" />
         </div>
       </fieldset>
       <fieldset class="wiz-fs">
-        <legend>3c · 运行参数（可选）</legend>
+        <legend>Optional run settings</legend>
         <div class="wiz-row2">
           <div class="row">
-            <label for="wizTicks">总 tick 数</label>
-            <input id="wizTicks" type="number" min="1" placeholder="不覆盖" />
+            <label for="wizTicks">Total rounds</label>
+            <input id="wizTicks" type="number" min="1" placeholder="Keep template setting" />
           </div>
           <div class="row">
-            <label for="wizSalience">议题刚需 problem_salience（0～1）</label>
-            <input id="wizSalience" type="number" min="0" max="1" step="0.05" placeholder="不覆盖" />
+            <label for="wizSalience">Problem salience (0-1)</label>
+            <input id="wizSalience" type="number" min="0" max="1" step="0.05" placeholder="Keep template setting" />
           </div>
         </div>
-        <p class="wiz-hint">刚需越高，负面舆情对支持度/信任的边际冲击通常越大（仍受品牌缓冲）。</p>
+        <p class="wiz-hint">Higher salience generally increases the impact of adverse sentiment on support and trust, subject to brand effects.</p>
       </fieldset>
       <fieldset class="wiz-fs">
-        <legend>4 · 本轮指挥台要点 player_brief</legend>
-        <p class="wiz-hint">写清你本轮要推的<strong>政策要点</strong>或<strong>产品/营销动作</strong>；将同步到主页「指挥台要点」并写入本次运行。</p>
-        <textarea id="wizBrief" rows="5" placeholder="例：拟出台××办法草案要点；或：发布××产品，定价与渠道策略…"></textarea>
+        <legend>Simulation brief</legend>
+        <p class="wiz-hint">Describe the <strong>policy proposal</strong> or <strong>product / marketing action</strong>. This brief is shared with the workspace and applied to this run.</p>
+        <textarea id="wizBrief" rows="5" placeholder="Summarize a proposed policy, or a product launch with pricing and channel strategy."></textarea>
       </fieldset>
       <div class="btn-row">
-        <button type="button" id="wizardApplyBtn">应用到本次运行</button>
-        <button type="button" class="btn-secondary" id="wizardCloseBtn">关闭</button>
+        <button type="button" id="wizardApplyBtn">Apply to this run</button>
+        <button type="button" class="btn-secondary" id="wizardCloseBtn">Close</button>
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <label>处置输入（出现“暂停”时在这里输入并继续）</label>
-    <textarea id="inlineSolution" rows="4" placeholder="暂停时在此输入方案（多套可用一行 --- 分隔），再点右侧提交"></textarea>
+  <section class="card" aria-labelledby="checkpoint-response-heading">
+    <h2 id="checkpoint-response-heading">Response at a paused checkpoint</h2>
+    <textarea id="inlineSolution" rows="4" placeholder="At a pause, write a response here. Separate multiple proposals with a line containing ---."></textarea>
     <div class="modal-actions">
-      <button type="button" id="inlineResumeBtn">提交并继续演练</button>
-      <span class="hint" id="inlineHint">当前未进入暂停状态。</span>
+      <button type="button" id="inlineResumeBtn">Submit & continue</button>
+      <span class="hint" id="inlineHint">No paused checkpoint is available.</span>
     </div>
-  </div>
+    <div class="modal-actions" style="margin-top: 0.45rem; align-items: center; flex-wrap: wrap; gap: 0.45rem;">
+      <label for="runtimeSwanPreset" class="hint" style="margin: 0">Preset</label>
+      <select id="runtimeSwanPreset" style="max-width: 14rem; padding: 0.3rem 0.45rem"></select>
+      <button type="button" class="btn-secondary" id="blackSwanInjectRuntimeBtn">Inject an extreme event</button>
+      <span class="hint" id="blackSwanRuntimeHint">Choose a preset or Custom event. Queued events are processed at the start of the next round. At a pause, inject into the current checkpoint.</span>
+    </div>
+  </section>
+  <footer class="workspace-footer"><span>Simulation output for stress testing and internal assessment.</span><a href="/">people / Home ↗</a></footer>
 
   <script>
+    const peopleMetricLabels = {"sentiment": ["Public sentiment", "公众情绪"], "economy_index": ["Economic outlook", "经济景气"], "policy_support": ["Policy support", "政策支持"], "rumor_level": ["Rumor pressure", "谣言压力"], "unrest": ["Social tension", "社会紧张"], "issuer_trust_proxy": ["Institutional trust", "主体信任"], "supply_chain_stress": ["Supply chain pressure", "供应链压力"], "diffusion_i_share": ["Information reach", "信息传播"], "diffusion_online_social": ["Social channels", "社交渠道"], "diffusion_mainstream_media": ["Media channels", "媒体渠道"], "diffusion_offline_community": ["Community channels", "社区渠道"], "diffusion_institutional_channel": ["Institutional channels", "机构渠道"], "cash_balance_million": ["Cash balance", "账面现金"], "fiscal_remaining_billion": ["Fiscal resources", "可用财力池"], "debt_balance_million": ["Debt principal", "债务本金"], "ticks": ["Rounds", "轮次"], "seed": ["Random seed", "随机种子"], "brand_equity": ["Brand equity", "品牌资产"], "场景": ["Scenario", "场景"], "类型": ["Exercise", "类型"], "行政层级": ["Administrative level", "行政层级"], "地名": ["Jurisdiction", "地名"], "发行方类型": ["Institution type", "发行方类型"], "议题刚需proxy": ["Problem salience", "议题刚需"]};
+    function metricLabel(key) {
+      const labels = peopleMetricLabels[key];
+      return labels ? (window.peopleI18n?.translate(labels[1]) || labels[0]) : key;
+    }
+    window.addEventListener('people-language-change', () => {
+      document.querySelectorAll('canvas').forEach(canvas => {
+        const plot = window.Chart?.getChart(canvas);
+        if (!plot) return;
+        plot.data.datasets.forEach(series => {
+          if (series.peopleMetricKey) series.label = metricLabel(series.peopleMetricKey);
+        });
+        plot.update('none');
+      });
+    });
+    Chart.defaults.font.family = 'DM Sans, PingFang SC, Microsoft YaHei, sans-serif';
+    Chart.defaults.color = '#625c55';
+    Chart.defaults.animation = matchMedia('(prefers-reduced-motion: reduce)').matches ? false : {duration:450};
     let chart = null;
     let chartExt = null;
     let chartFinance = null;
@@ -636,10 +725,104 @@
     let netNodes = null;
     let netEdges = null;
     window.__peopleCheckpoint = null;
+    window.__runControlToken = null;
+    window.__lastHeaderInfo = {};
+    window.__lastFinalMetrics = {};
+    window.__swanCustomActive = false;
+    window.__swanCustomLabel = "";
     window.__draftPlanCandidates = [];
     window.__lastPlanEvaluatePayload = null;
     window.__pendingInternalCommit = null;
     window.__wizardOverrides = {};
+    window.__uiMode = "professional";
+    window.__publicInference = null;
+    window.__publicGuideStep = 0;
+    window.__publicDecisionHistory = [];
+    window.__publicTimeline = {
+      t0_24h: [],
+      t2_7d: [],
+      t1_4w: [],
+      t1_3m: [],
+    };
+    window.__eventCatalog = [
+      { id: "launch_ads", label: "投放加速", cat: "目标" },
+      { id: "price_subsidy", label: "限时补贴", cat: "资源" },
+      { id: "public_apology", label: "公开致歉/澄清", cat: "舆情" },
+      { id: "hire_ops", label: "临时加人手", cat: "资源" },
+      { id: "supply_switch", label: "供应替代", cat: "供应链" },
+      { id: "qa_script", label: "客服问答脚本", cat: "舆情" },
+      { id: "channel_shift", label: "渠道重分配", cat: "目标" },
+      { id: "compliance_review", label: "法务合规复核", cat: "合规" },
+      { id: "local_creator", label: "本地达人联动", cat: "舆情" },
+      { id: "store_renov", label: "门店动线优化", cat: "门店" },
+      { id: "gov_briefing", label: "向监管情况通报", cat: "政策" },
+      { id: "policy_draft_consult", label: "征求意见稿定向听取", cat: "政策" },
+      { id: "town_hall", label: "基层座谈会/听证会", cat: "政策" },
+      { id: "pilot_zone", label: "小范围试点再扩面", cat: "政策" },
+      { id: "window_redesign", label: "办事窗口流程再造", cat: "政策" },
+      { id: "rumor_kill", label: "谣言溯源与辟谣", cat: "舆情" },
+      { id: "media_buy", label: "权威媒体专访定调", cat: "舆情" },
+      { id: "koc_repair", label: "KOC 口碑修复计划", cat: "舆情" },
+      { id: "community_mediation", label: "社区/业主群沟通", cat: "舆情" },
+      { id: "union_talk", label: "工会或员工代表对话", cat: "人力" },
+      { id: "cash_buffer", label: "紧急流动性垫资", cat: "资金" },
+      { id: "invoice_factoring", label: "应收账款保理", cat: "资金" },
+      { id: "capex_freeze", label: "非核心开支冻结", cat: "资金" },
+      { id: "dual_source", label: "关键件双供导入", cat: "供应链" },
+      { id: "safety_stock", label: "安全库存上调", cat: "供应链" },
+      { id: "logistics_switch", label: "物流承运商切换", cat: "供应链" },
+      { id: "recall_plan", label: "预防性召回预案演练", cat: "产品" },
+      { id: "warranty_extend", label: "延长保修/以换代修", cat: "产品" },
+      { id: "api_deprecate", label: "老旧接口下线公告", cat: "产品" },
+      { id: "data_breach_drill", label: "数据泄露桌面演练", cat: "数据" },
+      { id: "privacy_audit", label: "第三方隐私合规审计", cat: "数据" },
+      { id: "cross_border_legal", label: "跨境法务与税务复核", cat: "出海" },
+      { id: "tariff_buffer", label: "关税/汇率对冲预案", cat: "出海" },
+      { id: "local_partner", label: "在地合资或授权伙伴", cat: "出海" },
+      { id: "esg_report", label: "ESG 报告与第三方鉴证", cat: "ESG" },
+      { id: "green_packaging", label: "包装减塑与回收计划", cat: "ESG" },
+      { id: "charity_anchor", label: "定向公益与品牌绑定", cat: "ESG" },
+      { id: "antitrust_counsel", label: "反垄断申报辅导", cat: "监管" },
+      { id: "penalty_appeal", label: "处罚陈述与复议准备", cat: "监管" },
+      { id: "license_renew", label: "许可证续期与增项", cat: "监管" },
+      { id: "security_hardening", label: "工控/门店安防加固", cat: "安全" },
+      { id: "biz_cont_plan", label: "业务连续性（BCP）切换", cat: "安全" },
+      { id: "rnd_spike", label: "攻关组驻场研发", cat: "技术" },
+      { id: "tech_debt", label: "技术债分期偿还计划", cat: "技术" },
+      { id: "franchise_support", label: "加盟商督导与培训", cat: "渠道" },
+      { id: "price_lock", label: "大客户锁价协议", cat: "渠道" },
+      { id: "farmer_coop", label: "农产/源头直采签约", cat: "供应链" },
+      { id: "night_economy", label: "夜间经营时段试点", cat: "门店" },
+      { id: "school_outreach", label: "校园宣讲与实习通道", cat: "品牌" },
+      { id: "silver_economy", label: "适老化改造与银发营销", cat: "品牌" },
+    ];
+    window.__publicGuideSteps = [
+      {
+        title: "第1步：描述场景",
+        desc: "在上方场景框写你当前要演练的问题，建议包含目标、约束和担忧点。",
+        act: () => document.getElementById("publicSceneText")?.focus(),
+      },
+      {
+        title: "第2步：智能识别",
+        desc: "点击“智能识别场景与相关部门”，让系统给出类型建议与协同部门。",
+        act: () => document.getElementById("publicInferBtn")?.click(),
+      },
+      {
+        title: "第3步：拖事件卡片",
+        desc: "把左侧事件卡拖到右侧时间轴，组合现实中可能出现的动作与冲击。",
+        act: () => document.getElementById("eventBank")?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      },
+      {
+        title: "第4步：应用并运行",
+        desc: "先“应用到本次运行”，再“一键开始推演”。运行中可请求暂停，补充新决策后续跑。",
+        act: () => document.getElementById("publicApplyBtn")?.focus(),
+      },
+      {
+        title: "第5步：导出汇报",
+        desc: "推演完成后可导出 HTML 报告，或用打印版保存 PDF 作为汇报材料。",
+        act: () => document.getElementById("publicExportHtmlBtn")?.focus(),
+      },
+    ];
     window.__metricsHistory = [];
     window.__netEdgeAgg = new Map();
     window.__netDidInitialFit = false;
@@ -670,7 +853,7 @@
     function edgeColorForKind(kind) {
       const k = kind || "cross_actor_coordination";
       if (k === "regulator_contact") return { line: "#fbbf24", hi: "#fde68a" };
-      if (k === "gov_media_coordination") return { line: "#22d3ee", hi: "#a5f3fc" };
+      if (k === "gov_media_coordination") return { line: "#627d9d", hi: "#a5f3fc" };
       if (k === "enterprise_media_response") return { line: "#a3e635", hi: "#d9f99d" };
       return { line: "#7aa2f7", hi: "#c7d2fe" };
     }
@@ -819,7 +1002,374 @@
       if (ipc && ipc.plain_solution && String(ipc.plain_solution).trim()) {
         out.internal_plan_commit = ipc;
       }
+      const add = (document.getElementById("decisionLayerDraft")?.value || "").trim();
+      if (add) {
+        const prev = (out.brief || "").trim();
+        out.brief = prev ? `${prev}\n\n[新增决策指令]\n${add}` : add;
+      }
       return out;
+    }
+
+    function setUiMode(mode) {
+      window.__uiMode = mode === "public" ? "public" : "professional";
+      const isPublic = window.__uiMode === "public";
+      const panel = document.getElementById("publicModePanel");
+      if (panel) panel.style.display = isPublic ? "block" : "none";
+      // Public mode should be glanceable: hide dense expert cards/controls.
+      const decisionCard = document.getElementById("decisionLayerDraft")?.closest(".card");
+      if (decisionCard) decisionCard.style.display = isPublic ? "none" : "";
+      const wizardBtn = document.getElementById("openWizardBtn");
+      if (wizardBtn) wizardBtn.style.display = isPublic ? "none" : "";
+      document.querySelectorAll("[data-mode]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.mode === window.__uiMode)));
+      const advancedSummary = document.querySelector('details.row summary');
+      if (advancedSummary && advancedSummary.parentElement) {
+        advancedSummary.parentElement.style.display = isPublic ? "none" : "";
+      }
+      const ensPanel = document.querySelector(".ensemble-panel");
+      if (ensPanel) ensPanel.style.display = isPublic ? "none" : "";
+      const p = document.getElementById("modePickerBackdrop");
+      if (p) p.classList.remove("show");
+      if (isPublic) {
+        loadPublicDecisionHistory();
+        // History and the guide are opened by their existing explicit buttons.
+      }
+    }
+
+    function openPublicGuide() {
+      const b = document.getElementById("publicGuideBackdrop");
+      if (!b) return;
+      b.classList.add("show");
+      renderPublicGuideStep(window.__publicGuideStep || 0);
+    }
+
+    function closePublicGuide() {
+      const b = document.getElementById("publicGuideBackdrop");
+      if (b) b.classList.remove("show");
+    }
+
+    function renderPublicGuideStep(idx) {
+      const arr = window.__publicGuideSteps || [];
+      if (!arr.length) return;
+      const i = Math.max(0, Math.min(arr.length - 1, idx));
+      window.__publicGuideStep = i;
+      const step = arr[i];
+      document.getElementById("publicGuideTitle").textContent = step.title || "";
+      document.getElementById("publicGuideDesc").textContent = step.desc || "";
+      document.getElementById("publicGuideProgress").textContent = `步骤 ${i + 1} / ${arr.length}`;
+      const prev = document.getElementById("publicGuidePrevBtn");
+      const next = document.getElementById("publicGuideNextBtn");
+      if (prev) prev.disabled = i === 0;
+      if (next) next.disabled = i >= arr.length - 1;
+    }
+
+    async function exportCurrentReport(printPdf) {
+      const title =
+        (document.getElementById("scenario")?.value || "").trim() ||
+        (document.getElementById("publicSceneText")?.value || "").trim().slice(0, 24) ||
+        "people 决策报告";
+      const payload = {
+        mode: window.__uiMode === "public" ? "public" : "professional",
+        title: `${title} - ${new Date().toLocaleString()}`,
+        header: window.__lastHeaderInfo || {},
+        final_metrics: window.__lastFinalMetrics || {},
+        narrative: String(document.getElementById("narrative")?.textContent || "")
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean),
+        decision_layer_active_summary: String(
+          document.getElementById("decisionLayerActive")?.textContent || ""
+        ).trim(),
+      };
+      await ensurePeopleApiBase();
+      const r = await fetch(peopleApiUrl("/api/report/html"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.html) throw new Error(j.detail || j.error || "导出失败");
+      const w = window.open("", "_blank");
+      if (!w) throw new Error("浏览器拦截了新窗口，请允许弹窗后重试。");
+      w.document.open();
+      w.document.write(String(j.html));
+      w.document.close();
+      if (printPdf) {
+        setTimeout(() => w.print(), 200);
+      }
+    }
+
+    function applyPublicModeToRun() {
+      const text = (document.getElementById("publicSceneText").value || "").trim();
+      const baseScenario = document.getElementById("publicScenePreset").value || "default.yaml";
+      const pressure = Number(document.getElementById("publicPressure").value || "5");
+      const pace = Number(document.getElementById("publicPace").value || "5");
+      const inf = window.__publicInference || {};
+      const inferred = String(inf.inferred_mode || "").trim();
+      const timelineText = buildPublicTimelineText();
+      const checkedDepts = collectCheckedDepartments();
+      const briefParts = [
+        text,
+        `【用户偏好】压力强度=${pressure}/10；推进节奏=${pace}/10。`,
+      ];
+      if (Array.isArray(inf.media_channels) && inf.media_channels.length) {
+        briefParts.push("【主要传播渠道】" + inf.media_channels.join("、"));
+      }
+      if (Array.isArray(inf.departments) && inf.departments.length) {
+        briefParts.push("【建议相关部门】" + inf.departments.join("、"));
+      }
+      if (checkedDepts.length) {
+        briefParts.push("【本次协同清单】" + checkedDepts.join("、"));
+      }
+      if (timelineText) {
+        briefParts.push("【事件卡片时间轴】\n" + timelineText);
+      }
+      const brief = briefParts.filter(Boolean).join("\n");
+      document.getElementById("scenario").value = baseScenario;
+      document.getElementById("brief").value = brief;
+      const w = {};
+      if (inferred === "policy") {
+        w.exercise_type = "policy";
+        w.policy_admin_level = "county";
+        w.media_environment_brief = "以本地融媒体、社区群和短视频平台为主，传统全国媒体影响相对有限。";
+      } else if (inferred === "startup") {
+        w.exercise_type = "product";
+        w.issuer_archetype = "startup";
+        w.brand_equity = 0.35;
+        w.media_environment_brief = "以短视频平台、社群私域与口碑扩散为主，主流媒体覆盖有限。";
+      } else if (inferred === "shop") {
+        w.exercise_type = "product";
+        w.issuer_archetype = "sme";
+        w.brand_equity = 0.45;
+        w.regional_grounding_enabled = true;
+        w.business_scale = "street_shop";
+        w.media_environment_brief = "本地短视频与同城生活平台为主，新闻媒体曝光较低。";
+      } else if (inferred === "enterprise") {
+        w.exercise_type = "product";
+        w.issuer_archetype = "large_group";
+        w.brand_equity = 0.68;
+        w.media_environment_brief = "主流媒体与财经媒体联动传播，短视频平台会放大舆情波动。";
+      }
+      w.problem_salience = Math.max(0.1, Math.min(0.95, pressure / 10));
+      const ticks = Math.round(8 + (pace - 5) * 0.8);
+      w.ticks = Math.max(6, Math.min(16, ticks));
+      window.__wizardOverrides = w;
+      updateWizardStatusHint();
+    }
+
+    function loadPublicDecisionHistory() {
+      try {
+        const raw = localStorage.getItem("people_public_decision_history") || "[]";
+        const arr = JSON.parse(raw);
+        window.__publicDecisionHistory = Array.isArray(arr) ? arr : [];
+      } catch (_) {
+        window.__publicDecisionHistory = [];
+      }
+    }
+
+    function savePublicDecisionHistory() {
+      try {
+        localStorage.setItem(
+          "people_public_decision_history",
+          JSON.stringify((window.__publicDecisionHistory || []).slice(0, 80))
+        );
+      } catch (_) {}
+    }
+
+    function openPublicHistory(forceShow = true) {
+      const body = document.getElementById("publicHistoryBody");
+      const arr = Array.isArray(window.__publicDecisionHistory) ? window.__publicDecisionHistory : [];
+      if (!arr.length) {
+        body.textContent = "暂无历史决策。你在大众模式追加并执行后会出现在这里。";
+      } else {
+        body.textContent = arr
+          .slice(0, 30)
+          .map((x, i) => `${i + 1}. [${x.ts || ""}] ${x.text || ""}`)
+          .join("\n\n");
+      }
+      if (forceShow) document.getElementById("publicHistoryBackdrop").classList.add("show");
+    }
+
+    function renderEventBank() {
+      const bank = document.getElementById("eventBank");
+      if (!bank) return;
+      bank.innerHTML = window.__eventCatalog
+        .map(
+          (c) =>
+            `<button type="button" class="event-card" draggable="true" data-event-id="${c.id}" data-event-label="${escapeHtml(c.label)}"><span>${escapeHtml(c.label)}</span><small>${escapeHtml(c.cat)}</small></button>`
+        )
+        .join("");
+      bank.querySelectorAll(".event-card").forEach((el) => {
+        el.addEventListener("click", () => {
+          const key = window.__eventTarget || "t0_24h";
+          window.__publicTimeline[key].push({id:el.dataset.eventId,label:el.dataset.eventLabel});
+          renderTimelineLanes();
+          document.getElementById("timelineAddStatus").textContent = window.peopleI18n?.translate("事件已加入时间轴。") || "Event added to the timeline.";
+        });
+        el.addEventListener("dragstart", (e) => {
+          const payload = JSON.stringify({
+            id: el.getAttribute("data-event-id"),
+            label: el.getAttribute("data-event-label"),
+          });
+          e.dataTransfer.setData("text/plain", payload);
+        });
+      });
+    }
+
+    function laneLabel(k) {
+      if (k === "t0_24h") return "0～24小时";
+      if (k === "t2_7d") return "2～7天";
+      if (k === "t1_4w") return "1～4周";
+      return "1～3月";
+    }
+
+    function renderTimelineLanes() {
+      document.querySelectorAll(".timeline-lane").forEach((lane) => {
+        const key = lane.getAttribute("data-lane");
+        const box = lane.querySelector(".lane-items");
+        const arr = window.__publicTimeline[key] || [];
+        box.innerHTML = arr
+          .map((it, idx) => `<button type="button" class="planned-chip" data-lane="${key}" data-idx="${idx}" title="点击删除"><span class="sr-only">Remove event:</span> <span>${escapeHtml(it.label)}</span><span aria-hidden="true"> ×</span></button>`)
+          .join("");
+        box.querySelectorAll(".planned-chip").forEach((chip) => {
+          chip.addEventListener("click", () => {
+            const k = chip.getAttribute("data-lane");
+            const i = Number(chip.getAttribute("data-idx"));
+            if (!Number.isFinite(i)) return;
+            window.__publicTimeline[k].splice(i, 1);
+            renderTimelineLanes();
+          });
+        });
+      });
+    }
+
+    function bindTimelineDnD() {
+      document.querySelectorAll("[data-event-target]").forEach(button => button.addEventListener("click", () => {
+        window.__eventTarget = button.dataset.eventTarget;
+        document.querySelectorAll("[data-event-target]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      }));
+      document.querySelectorAll(".timeline-lane").forEach((lane) => {
+        lane.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          lane.classList.add("dragover");
+        });
+        lane.addEventListener("dragleave", () => lane.classList.remove("dragover"));
+        lane.addEventListener("drop", (e) => {
+          e.preventDefault();
+          lane.classList.remove("dragover");
+          const key = lane.getAttribute("data-lane");
+          try {
+            const raw = e.dataTransfer.getData("text/plain");
+            const obj = JSON.parse(raw || "{}");
+            if (!obj.label) return;
+            window.__publicTimeline[key].push({ id: obj.id || "custom", label: String(obj.label) });
+            renderTimelineLanes();
+          } catch (_) {}
+        });
+      });
+    }
+
+    function buildPublicTimelineText() {
+      const parts = [];
+      Object.keys(window.__publicTimeline || {}).forEach((k) => {
+        const arr = window.__publicTimeline[k] || [];
+        if (!arr.length) return;
+        parts.push(`${laneLabel(k)}：${arr.map((x) => x.label).join("、")}`);
+      });
+      return parts.join("\n");
+    }
+
+    function renderDepartmentChecks(items) {
+      const wrap = document.getElementById("publicDeptChecks");
+      if (!wrap) return;
+      const arr = Array.isArray(items) ? items : [];
+      if (!arr.length) {
+        wrap.innerHTML = '<span class="hint">先点击“智能识别场景与相关部门”生成建议。</span>';
+        return;
+      }
+      wrap.innerHTML = arr
+        .map(
+          (d, i) =>
+            `<label><input type="checkbox" data-dept="${escapeHtml(String(d))}" ${i < 4 ? "checked" : ""} />${escapeHtml(String(d))}</label>`
+        )
+        .join("");
+    }
+
+    function collectCheckedDepartments() {
+      const out = [];
+      document.querySelectorAll("#publicDeptChecks input[type=checkbox]").forEach((el) => {
+        if (el.checked) out.push(el.getAttribute("data-dept") || "");
+      });
+      return out.filter(Boolean);
+    }
+
+    function renderSpecialCards(result) {
+      const wrap = document.getElementById("specialCardsWrap");
+      const hint = document.getElementById("specialHint");
+      const mna = result?.mna_card || {};
+      const launch = result?.launch_card || {};
+      const matrix = Array.isArray(result?.conflict_matrix) ? result.conflict_matrix : [];
+      document.getElementById("mnaCardBox").textContent =
+        `成功概率区间：${result?.success_probability_range || "-"}\n` +
+        `整合时长：${mna.integration_timeline || result?.integration_timeline_weeks || "-"}\n` +
+        `现金占用：${mna.cash_occupancy || result?.cash_occupancy || "-"}\n` +
+        `审批/反垄断风险：${mna.approval_risk || `${result?.regulatory_resistance || "-"} / ${result?.antitrust_resistance || "-"}`}\n` +
+        `组织冲突评分：${mna.org_conflict_score ?? "-"}`;
+      document.getElementById("launchCardBox").textContent =
+        `成功概率区间：${result?.success_probability_range || "-"}\n` +
+        `上线窗口：${launch.launch_window || "-"}\n` +
+        `渠道承载：${launch.channel_capacity || "-"}\n` +
+        `客服峰值：${launch.customer_service_peak || "-"}\n` +
+        `人力与回滚：${launch.manpower_and_rollback || "-"}`;
+      const rows = matrix
+        .map(
+          (x) =>
+            `<tr><td>${escapeHtml(String(x.department_a || ""))}</td><td>${escapeHtml(String(x.department_b || ""))}</td><td>${escapeHtml(String(x.conflict_point || ""))}</td><td>${escapeHtml(String(x.compromise_path || ""))}</td><td>${escapeHtml(String(x.severity || ""))}</td></tr>`
+        )
+        .join("");
+      document.getElementById("conflictMatrixBox").innerHTML =
+        `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">` +
+        `<thead><tr><th style="text-align:left;border-bottom:1px solid #e1dbd2;">部门A</th><th style="text-align:left;border-bottom:1px solid #e1dbd2;">部门B</th><th style="text-align:left;border-bottom:1px solid #e1dbd2;">冲突点</th><th style="text-align:left;border-bottom:1px solid #e1dbd2;">妥协路径</th><th style="text-align:left;border-bottom:1px solid #e1dbd2;">级别</th></tr></thead>` +
+        `<tbody>${rows || '<tr><td colspan="5" style="color:#706b65;">暂无</td></tr>'}</tbody></table>`;
+      wrap.style.display = "block";
+      hint.textContent = `专项评估已生成：关键前提 ${((result?.key_prerequisites || []).length || 0)} 条。`;
+    }
+
+    async function runSpecialEvaluation(focus) {
+      applyPublicModeToRun();
+      const txt = (document.getElementById("publicSceneText").value || "").trim() || (document.getElementById("brief").value || "").trim();
+      if (!txt) {
+        document.getElementById("specialHint").textContent = "请先输入场景描述。";
+        return;
+      }
+      const hint = document.getElementById("specialHint");
+      hint.textContent = "专项评估中…";
+      try {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/public-mode/special-evaluate"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            focus,
+            scenario_text: txt,
+            decision_context_hint: {
+              inferred_mode: window.__publicInference?.inferred_mode || "",
+              departments: collectCheckedDepartments(),
+              timeline: buildPublicTimelineText(),
+            },
+            plan_search_enabled: !!document.getElementById("planSearchEnabled")?.checked,
+            plan_search_provider: document.getElementById("planSearchProvider")?.value || null,
+            ...apiFields(),
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          hint.textContent = j.detail || j.error || "专项评估失败";
+          return;
+        }
+        renderSpecialCards(j.result || {});
+      } catch (e) {
+        hint.textContent = String(e);
+      }
     }
 
     function escapeHtml(s) {
@@ -848,11 +1398,35 @@
     }
 
     function apiFields() {
+      const toNum = (id) => {
+        const v = Number((document.getElementById(id)?.value || "").trim());
+        return Number.isFinite(v) ? v : null;
+      };
+      const clamp01 = (v, defv) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return defv;
+        return Math.max(0, Math.min(1, n));
+      };
+      const pPolicy = clamp01(document.getElementById("iiProbPolicy")?.value, 0.09);
+      const pEnt = clamp01(document.getElementById("iiProbEnterprise")?.value, 0.08);
+      const pSt = clamp01(document.getElementById("iiProbStartup")?.value, 0.11);
+      const pShop = clamp01(document.getElementById("iiProbShop")?.value, 0.12);
       return {
         primary: document.getElementById("primary").value.trim() || null,
         fast: document.getElementById("fast").value.trim() || null,
         openai_api_key: document.getElementById("key").value.trim() || null,
         openai_base_url: document.getElementById("base").value.trim() || null,
+        internal_issues_enabled: !!document.getElementById("iiEnabled")?.checked,
+        internal_issue_trigger_pause: !!document.getElementById("iiTriggerPause")?.checked,
+        internal_issue_cooldown_ticks: toNum("iiCooldown"),
+        internal_issue_probability_policy: pPolicy,
+        internal_issue_probability_enterprise: pEnt,
+        internal_issue_probability_startup: pSt,
+        internal_issue_probability_shop: pShop,
+        internal_issue_sampling_scope: document.getElementById("iiScope")?.value || "auto",
+        plan_search_enabled: !!document.getElementById("planSearchEnabled")?.checked,
+        plan_search_focus: document.getElementById("planSearchFocus")?.value || "general",
+        plan_search_provider: document.getElementById("planSearchProvider")?.value || null,
       };
     }
 
@@ -935,41 +1509,41 @@
         layout: { improvedLayout: true, randomSeed: 7 },
         physics: NET_PHYSICS,
         nodes: {
-          font: { color: "#e2e8f0", size: 12, face: "Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" },
+          font: { color: "#203652", size: 12, face: "Segoe UI, PingFang SC, Microsoft YaHei, sans-serif" },
           borderWidth: 2,
-          shadow: { enabled: true, color: "rgba(0,0,0,0.35)", size: 10, x: 2, y: 2 },
+          shadow: { enabled: true, color: "rgba(32,54,82,0.12)", size: 10, x: 2, y: 2 },
           margin: 8,
         },
         groups: {
           cohort: {
             shape: "box",
-            color: { background: "rgba(124,58,237,0.9)", border: "#ddd6fe" },
-            font: { color: "#faf5ff", size: 11 },
+            color: { background: "#e5dcd0", border: "#a99986" },
+            font: { color: "#203652", size: 11 },
             margin: 12,
             borderWidth: 2,
           },
           regulator: {
             shape: "dot",
             size: 28,
-            color: { background: "#d97706", border: "#fcd34d" },
+            color: { background: "#a47850", border: "#8a6441" },
             font: { color: "#fffbeb", size: 11, bold: true },
           },
           media: {
             shape: "dot",
             size: 26,
-            color: { background: "#0891b2", border: "#67e8f9" },
+            color: { background: "#627d9d", border: "#526f90" },
             font: { color: "#ecfeff", size: 11 },
           },
           enterprise: {
             shape: "dot",
             size: 24,
-            color: { background: "#4d7c0f", border: "#bef264" },
+            color: { background: "#546779", border: "#203652" },
             font: { color: "#f7fee7", size: 11 },
           },
           actor: {
             shape: "dot",
             size: 22,
-            color: { background: "#2563eb", border: "#93c5fd" },
+            color: { background: "#203d60", border: "#203652" },
             font: { color: "#eff6ff", size: 11 },
           },
         },
@@ -981,7 +1555,7 @@
             size: 10,
             align: "middle",
             strokeWidth: 0,
-            background: "rgba(15,20,28,0.78)",
+            background: "rgba(246,243,238,0.9)",
           },
           smooth: { type: "cubicBezier", roundness: 0.42, forceDirection: "none" },
           selectionWidth: 2,
@@ -1004,7 +1578,7 @@
         if (!window.__netDidInitialFit) {
           window.__netDidInitialFit = true;
           try {
-            net.fit({ animation: { duration: 420, easingFunction: "easeInOutQuad" } });
+            net.fit({ animation: { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 420, easingFunction: "easeInOutQuad" } });
           } catch (_) {}
         }
       });
@@ -1012,7 +1586,7 @@
         window.__netToolbarBound = true;
         document.getElementById("netFitBtn")?.addEventListener("click", () => {
           try {
-            net.fit({ animation: { duration: 380, easingFunction: "easeInOutQuad" } });
+            net.fit({ animation: { duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380, easingFunction: "easeInOutQuad" } });
           } catch (_) {}
         });
         document.getElementById("netStabBtn")?.addEventListener("click", () => {
@@ -1107,7 +1681,7 @@
         id: rec.id,
         width: w,
         label: labParts.join(" "),
-        title: rec.tips.length ? rec.tips.join("\n——\n") : (sum || kind),
+        title: rec.tips.length ? rec.tips.join("\n--\n") : (sum || kind),
         color: { color: line, highlight: hi, hover: hi },
       });
       const maxEdges = 100;
@@ -1156,9 +1730,10 @@
       const ex = window.__exerciseType || "";
       const m = metrics || {};
       const isProduct = ex === "product";
+      box.classList.toggle("is-disabled", !fe);
       if (!fe) {
         box.innerHTML =
-          '<span class="fs-muted">本场景未启用 <code>operational_finance</code>：页面上不推演账面 / 财力。请在 YAML 设 <code>operational_finance.enabled: true</code>（产品盘默认有<strong>账面现金</strong>；政策盘常配 <code>fiscal_pool_billion</code> 显示<strong>财力池</strong>）。</span>';
+          '<span>本场景未开启财务推演。</span>';
         return;
       }
       const c = m.cash_balance_million;
@@ -1168,11 +1743,11 @@
       const cashVal =
         c != null && c !== undefined
           ? '<span class="val">' + Number(c).toFixed(2) + "</span> <span class=\"fs-muted\">百万 proxy</span>"
-          : '<span class="val">—</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
+          : '<span class="val">-</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
       const debtVal =
         d != null && d !== undefined
           ? '<span class="val">' + Number(d).toFixed(2) + "</span> <span class=\"fs-muted\">百万 proxy（有息负债本金余额）</span>"
-          : '<span class="val">—</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
+          : '<span class="val">-</span> <span class="fs-muted">（首轮 tick 后读数）</span>';
       if ((c != null && c !== undefined) || (isProduct && fe)) {
         parts.push('<div class="fs-item"><strong>账面现金</strong> ' + cashVal + "</div>");
       }
@@ -1197,7 +1772,7 @@
       box.innerHTML =
         '<div class="fs-row">' +
         parts.join("") +
-        '</div><div class="fs-muted" style="margin-top:0.35rem;">数额为演练用 proxy：以 YAML <code>operational_finance</code> 为准可贴近真实体量；未写且仍为模板默认时，引擎会按 issuer 档位写意初值。合作报价等叙事与此账面自洽。暂停时可「财务手工调账」。勾选 checkpoint 的「仅评估」会带入当时账面。</div>';
+        '</div><div class="fs-muted" style="margin-top:0.35rem;">数额为演练用 proxy：以 YAML <code>operational_finance</code> 为准可贴近真实体量；未写且仍为模板默认时，引擎会按 issuer 档位写意初值。合作报价等叙事与此账面自洽。暂停时可「财务手工调账」。勾选 checkpoint 后「评估本决策」会带入当时账面。</div>';
     }
 
     function renderFinanceChart(history) {
@@ -1223,7 +1798,7 @@
       }
       row.style.display = "block";
       const labels = history.map((_, i) => "t" + (i + 1));
-      const colors = ["#94e2d5", "#fca5a5", "#fcd34d"];
+      const colors = ["#203d60", "#996e60", "#a47850"];
       const labelMap = {
         cash_balance_million: "账面现金（百万 proxy）",
         fiscal_remaining_billion: "财力池（十亿）",
@@ -1248,10 +1823,10 @@
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2.2,
-          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          plugins: { legend: { labels: { color: "#5e6670", boxWidth: 10 } } },
           scales: {
-            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
-            y: { ticks: { color: "#94e2d5" }, grid: { color: "#2a3544" } },
+            x: { ticks: { color: "#706b65" }, grid: { color: "#e1dbd2" } },
+            y: { ticks: { color: "#8a6441" }, grid: { color: "#e1dbd2" } },
           },
         },
       });
@@ -1267,7 +1842,7 @@
         lines.push("要点：\n" + d.intent_bullets.map((x) => "  · " + x).join("\n"));
       if (d.professional_execution_plan) lines.push("执行层表述：\n" + d.professional_execution_plan);
       if (d.feasibility)
-        lines.push("可执行性：" + d.feasibility + (d.feasibility_notes ? " — " + d.feasibility_notes : ""));
+        lines.push("可执行性：" + d.feasibility + (d.feasibility_notes ? " - " + d.feasibility_notes : ""));
       if (d.involved_functions && d.involved_functions.length) lines.push("涉及职能：" + d.involved_functions.join("、"));
       if (d.estimated_timeline_cn) lines.push("阶段周期：" + d.estimated_timeline_cn);
       if (d.policy_equivalent_steps) lines.push("政策流程映射：" + d.policy_equivalent_steps);
@@ -1292,11 +1867,11 @@
     function refreshDraftPlanCandidateSelect() {
       const sel = document.getElementById("draftPlanCandidateSelect");
       if (!sel) return;
-      sel.innerHTML = '<option value="">— 选一套载入 —</option>';
+      sel.innerHTML = '<option value="">- 选一套载入 -</option>';
       (window.__draftPlanCandidates || []).forEach((c, i) => {
         const o = document.createElement("option");
         o.value = String(i);
-        o.textContent = c.label || "草案 " + (i + 1);
+        o.textContent = c.label || "决策 " + (i + 1);
         sel.appendChild(o);
       });
     }
@@ -1385,7 +1960,7 @@
     function fillHistorySelect(history) {
       const sel = document.getElementById("historyPlanPick");
       if (!sel) return;
-      sel.innerHTML = '<option value="">— 载入历史 —</option>';
+      sel.innerHTML = '<option value="">- 载入历史 -</option>';
       window.__decisionHistory = history || [];
       window.__decisionHistory.forEach((h, i) => {
         const o = document.createElement("option");
@@ -1398,7 +1973,7 @@
       });
     }
 
-    /** 在现有「历史方案」列表前插入一条（如内部「确认执行」后的草案），上限 32 条 */
+    /** 在现有「历史方案」列表前插入一条（如内部「确认执行」后的决策），上限 32 条 */
     function prependDecisionHistoryEntry(entry) {
       const prev = Array.isArray(window.__decisionHistory) ? [...window.__decisionHistory] : [];
       prev.unshift({
@@ -1506,7 +2081,7 @@
       for (const e of events) {
         const kind = e.kind || "";
         const unfav = kind === "media_unfavorable";
-        const tick = e.tick != null ? `t${e.tick}` : "—";
+        const tick = e.tick != null ? `t${e.tick}` : "-";
         const title = escapeHtml(e.title || kind || "细节");
         const body = escapeHtml(e.body || "");
         const div = document.createElement("div");
@@ -1517,23 +2092,84 @@
       panel.scrollTop = panel.scrollHeight;
     }
 
+    function renderGameTimelineFromTick(ev) {
+      const box = document.getElementById("gameTimeline");
+      if (!box) return;
+      const rows = Array.isArray(ev.actor_timelines_tick) ? ev.actor_timelines_tick : [];
+      if (!rows.length) return;
+      const sel = document.getElementById("gameActorFilter");
+      const filterId = sel ? sel.value || "" : "";
+      // 收集主体列表
+      const actors = new Set();
+      for (const r of rows) {
+        const m = r.meta || {};
+        const aid = m.actor_id || m.from_id || m.to_id || "";
+        if (aid) actors.add(aid);
+      }
+      if (sel && !sel._filled) {
+        for (const aid of actors) {
+          const opt = document.createElement("option");
+          opt.value = aid;
+          opt.textContent = aid;
+          sel.appendChild(opt);
+        }
+        sel._filled = true;
+      }
+      const frag = document.createDocumentFragment();
+      for (const r of rows) {
+        const kind = r.kind || "";
+        const meta = r.meta || {};
+        const aid = meta.actor_id || meta.from_id || meta.to_id || "";
+        if (filterId && aid && aid !== filterId) continue;
+        const row = document.createElement("div");
+        row.className = "game-row";
+        const t = document.createElement("div");
+        t.className = "game-tick";
+        t.textContent = "t" + (r.tick != null ? r.tick : "?");
+        const a = document.createElement("div");
+        a.className = "game-actor";
+        const label = meta.actor_role || meta.from_label || meta.to_label || aid || r.title || "主体";
+        a.textContent = label;
+        const b = document.createElement("div");
+        b.className = "game-body";
+        const tag = document.createElement("span");
+        tag.className = "game-kind-tag";
+        tag.textContent = kind;
+        const body = document.createElement("span");
+        body.textContent = String(r.body || "").replace(/\s+/g, " ").slice(0, 160);
+        b.appendChild(tag);
+        b.appendChild(body);
+        row.appendChild(t);
+        row.appendChild(a);
+        row.appendChild(b);
+        frag.appendChild(row);
+      }
+      if (!frag.childNodes.length) return;
+      // 首次渲染时清空提示
+      if (box.querySelector(".hint")) box.innerHTML = "";
+      box.appendChild(frag);
+      box.scrollTop = box.scrollHeight;
+    }
+
     function applyCompletePayload(data) {
       const h = data.header || {};
+      window.__lastHeaderInfo = { ...h };
       document.getElementById("headerInfo").innerHTML = [
         ["场景", h.name],
         ["类型", h.exercise_type],
         ["ticks", h.ticks],
         ["seed", h.seed],
         ["行政层级", h.admin_level],
-        ["地名", h.jurisdiction_name || "—"],
+        ["地名", h.jurisdiction_name || "-"],
         ["发行方类型", h.issuer_archetype],
         ["brand_equity", h.brand_equity],
       ]
-        .map(([k, v]) => `<span class="pill">${k}: ${v}</span>`)
+        .map(([k, v]) => `<span class="pill"><span>${escapeHtml(metricLabel(k))}</span>: <span data-no-translate>${escapeHtml(String(v ?? "-"))}</span></span>`)
         .join(" ");
       const fm = data.final_metrics || {};
+      window.__lastFinalMetrics = { ...fm };
       document.getElementById("finalMetrics").innerHTML = Object.entries(fm)
-        .map(([k, v]) => `<span class="pill">${k}: ${typeof v === "number" ? v.toFixed(4) : v}</span>`)
+        .map(([k, v]) => `<span class="pill" title="${escapeHtml(k)}"><span>${escapeHtml(metricLabel(k))}</span>: <span data-no-translate>${typeof v === "number" ? v.toFixed(4) : escapeHtml(String(v))}</span></span>`)
         .join(" ");
       document.getElementById("narrative").textContent = (data.narrative || []).join("\n");
       updateDecisionLayerPanel(data.decision_layer_active_summary || "");
@@ -1550,7 +2186,7 @@
         document.getElementById("detailPanel").innerHTML = "";
         appendDetailEvents(data.detail_events);
       }
-      const sec = data.elapsed_seconds != null ? `（用时 ${data.elapsed_seconds}s）` : "";
+      const sec = data.elapsed_seconds != null ? ` （用时 ${data.elapsed_seconds}s）` : "";
       document.getElementById("status").innerHTML =
         '<span style="color:var(--ok)">完成</span>' + sec;
     }
@@ -1570,14 +2206,14 @@
       ];
       const keys = baseKeys.filter((k) => history.some((h) => h[k] != null && h[k] !== undefined));
       if (!keys.length) keys.push("policy_support");
-      const colors = ["#3d8bfd", "#f7768e", "#9ece6a", "#e0af68", "#bb9af7", "#7aa2f7", "#ff9e64", "#94e2d5", "#fca5a5"];
+      const colors = ["#203d60", "#ac4036", "#7a8797", "#8a6441", "#627d9d", "#9a8268", "#546779", "#b09371", "#996e60"];
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
         type: "line",
         data: {
           labels,
           datasets: keys.map((k, i) => ({
-            label: k,
+            label: metricLabel(k), peopleMetricKey: k,
             data: history.map((h) => h[k] ?? null),
             borderColor: colors[i % colors.length],
             tension: 0.22,
@@ -1590,12 +2226,12 @@
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2.2,
-          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          plugins: { legend: { labels: { color: "#5e6670", boxWidth: 10 } } },
           scales: {
-            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
+            x: { ticks: { color: "#706b65" }, grid: { color: "#e1dbd2" } },
             y: {
-              ticks: { color: "#8b9cb3" },
-              grid: { color: "#2a3544" },
+              ticks: { color: "#706b65" },
+              grid: { color: "#e1dbd2" },
               suggestedMin: -0.08,
               suggestedMax: 1.05,
             },
@@ -1610,6 +2246,9 @@
       for (const row of history) {
         Object.keys(row).forEach((k) => {
           if (k.startsWith("kpi_") || k === "diffusion_i_share") extKeys.add(k);
+          if (k === "price_proxy" || k === "volume_proxy" || k === "market_share_proxy" || k === "roi_proxy") {
+            extKeys.add(k);
+          }
           if (k === "resource_manpower" || k === "resource_political_capital") extKeys.add(k);
         });
       }
@@ -1631,12 +2270,12 @@
         }
         return true;
       });
-      const palette = ["#c084fc", "#38bdf8", "#4ade80", "#fb923c", "#f472b6", "#a78bfa", "#2dd4bf"];
+      const palette = ["#203d60", "#8a6441", "#627d9d", "#9a8268", "#546779", "#996e60", "#b09371"];
       const datasets = [];
       let pi = 0;
       for (const k of normKeys) {
         datasets.push({
-          label: k,
+          label: metricLabel(k), peopleMetricKey: k,
           data: history.map((h) => h[k] ?? null),
           borderColor: palette[pi % palette.length],
           tension: 0.2,
@@ -1649,9 +2288,9 @@
       }
       for (const k of resIdx) {
         datasets.push({
-          label: k,
+          label: metricLabel(k), peopleMetricKey: k,
           data: history.map((h) => h[k] ?? null),
-          borderColor: "#fcd34d",
+          borderColor: "#a47850",
           tension: 0.2,
           fill: false,
           pointRadius: 2,
@@ -1668,14 +2307,14 @@
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2.2,
-          plugins: { legend: { labels: { color: "#c0c8d4", boxWidth: 10 } } },
+          plugins: { legend: { labels: { color: "#5e6670", boxWidth: 10 } } },
           scales: {
-            x: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" } },
+            x: { ticks: { color: "#706b65" }, grid: { color: "#e1dbd2" } },
             y: {
               id: "y",
               position: "left",
-              ticks: { color: "#a78bfa" },
-              grid: { color: "#2a3544" },
+              ticks: { color: "#627d9d" },
+              grid: { color: "#e1dbd2" },
               suggestedMin: -1.05,
               suggestedMax: 1.05,
             },
@@ -1683,7 +2322,7 @@
               id: "y1",
               position: "right",
               display: resIdx.length > 0,
-              ticks: { color: "#fcd34d" },
+              ticks: { color: "#a47850" },
               grid: { drawOnChartArea: false },
             },
           },
@@ -1712,22 +2351,22 @@
             {
               label: "p10",
               data: keys.map((k) => dist[k].p10),
-              backgroundColor: "rgba(61,139,253,0.45)",
-              borderColor: "#3d8bfd",
+              backgroundColor: "rgba(49,92,124,0.6)",
+              borderColor: "#315c7c",
               borderWidth: 1,
             },
             {
               label: "p50",
               data: keys.map((k) => dist[k].p50),
-              backgroundColor: "rgba(158,206,106,0.55)",
-              borderColor: "#9ece6a",
+              backgroundColor: "rgba(122,135,151,0.6)",
+              borderColor: "#7a8797",
               borderWidth: 1,
             },
             {
               label: "p90",
               data: keys.map((k) => dist[k].p90),
-              backgroundColor: "rgba(247,118,142,0.45)",
-              borderColor: "#f7768e",
+              backgroundColor: "rgba(164,120,80,0.6)",
+              borderColor: "#ac4036",
               borderWidth: 1,
             },
           ],
@@ -1736,10 +2375,10 @@
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2.4,
-          plugins: { legend: { labels: { color: "#c0c8d4" } } },
+          plugins: { legend: { labels: { color: "#5e6670" } } },
           scales: {
-            x: { ticks: { color: "#8b9cb3", maxRotation: 45, minRotation: 25 } },
-            y: { ticks: { color: "#8b9cb3" }, grid: { color: "#2a3544" }, beginAtZero: false },
+            x: { ticks: { color: "#706b65", maxRotation: 45, minRotation: 25 } },
+            y: { ticks: { color: "#706b65" }, grid: { color: "#e1dbd2" }, beginAtZero: false },
           },
         },
       });
@@ -1795,6 +2434,7 @@
     function handleStreamEvent(ev) {
       const ph = ev.phase;
       if (ph === "run_start") {
+        window.__runControlToken = ev.run_control_token || window.__runControlToken || null;
         window.__pendingInternalCommit = null;
         window.__metricsHistory = [];
         const fi = ev.finance_enabled ? " · 财务细节开" : "";
@@ -1814,8 +2454,21 @@
         window.__exerciseType = ev.exercise_type || "";
         updateFinanceSnapshot({});
       } else if (ph === "resume_start") {
+        window.__runControlToken = ev.run_control_token || window.__runControlToken || null;
         document.getElementById("liveDetail").textContent =
           `续跑：已完成 ${ev.tick_completed} tick，剩余约 ${ev.remaining_ticks} tick`;
+      } else if (ph === "black_swan_injected") {
+        const rows = Array.isArray(ev.events) ? ev.events : [];
+        if (rows.length) {
+          rows.forEach((x) => {
+            const nm = x.title || x.preset_id || "black_swan";
+            appendLiveLog(`! 黑天鹅注入: ${nm} -> ${JSON.stringify(x.deltas || {})}`);
+          });
+        } else {
+          appendLiveLog("! 黑天鹅注入：已接收（无显式 delta）");
+        }
+        document.getElementById("liveDetail").textContent = "黑天鹅事件已注入并将在本轮/下一轮生效";
+      } else if (ph === "resolution_digest") {
         if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
         if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
       } else if (ph === "resolution_digest") {
@@ -1856,7 +2509,7 @@
           `第 ${ev.tick}/${ev.total_ticks} tick · ${ev.agent_count} 个 LLM 智能体${tr}`;
         if (ev.internal_plan_milestones && ev.internal_plan_milestones.length) {
           ev.internal_plan_milestones.forEach((line) =>
-            appendLiveLog("⏱ 内部草案·约定节点：" + String(line).slice(0, 420)),
+            appendLiveLog("⏱ 内部决策·约定节点：" + String(line).slice(0, 420)),
           );
         }
       } else if (ph === "agent_llm_start") {
@@ -1891,11 +2544,11 @@
         const bits = ["policy_support", "unrest", "sentiment", "cash_balance_million", "fiscal_remaining_billion"]
           .filter((k) => m[k] != null)
           .map((k) => `${k}=${Number(m[k]).toFixed(3)}`);
-        appendLiveLog(`— tick ${ev.tick} 结束 · ${bits.join(" · ")}`);
+        appendLiveLog(`- tick ${ev.tick} 结束 · ${bits.join(" · ")}`);
         if (ev.primary_llm_calls_total != null)
-          appendLiveLog(`— 累计关键智能体 LLM ${ev.primary_llm_calls_total} 次`);
+          appendLiveLog(`- 累计关键智能体 LLM ${ev.primary_llm_calls_total} 次`);
         if (ev.attribution_tick && ev.attribution_tick.length) {
-          appendLiveLog(`— 本 tick 溯源 ${ev.attribution_tick.length} 条（层/组件→Δ指标）`);
+          appendLiveLog(`- 本 tick 溯源 ${ev.attribution_tick.length} 条（层/组件→Δ指标）`);
           ev.attribution_tick.slice(-12).forEach((a) => {
             const d = a.deltas && Object.keys(a.deltas).length ? JSON.stringify(a.deltas) : JSON.stringify(a.meta || {});
             appendLiveLog(`   · [${a.layer}/${a.component}] ${d.slice(0, 160)}`);
@@ -1904,6 +2557,7 @@
         renderRiskBoard(m);
         if (ev.horizon) renderHorizon(ev.horizon);
         appendDetailEvents(ev.detail_events_tick || []);
+        renderGameTimelineFromTick(ev);
         if (ev.metrics && typeof ev.metrics === "object") {
           window.__metricsHistory.push({ ...ev.metrics });
           renderChart(window.__metricsHistory);
@@ -1912,11 +2566,14 @@
           updateFinanceSnapshot(ev.metrics);
         }
       } else if (ph === "complete") {
+        window.__runControlToken = null;
         if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
         if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
         applyCompletePayload(ev);
         return "stop";
       } else if (ph === "crisis_pause") {
+        /* Worker releases run_control_token in finally after this event; keeping it causes inject 404. */
+        window.__runControlToken = null;
         if (ev.finance_enabled != null) window.__financeEnabled = !!ev.finance_enabled;
         if (ev.exercise_type) window.__exerciseType = ev.exercise_type;
         window.__peopleCheckpoint = ev.checkpoint_token;
@@ -1992,24 +2649,26 @@
           renderExtensionChart(ev.metrics_history);
           renderFinanceChart(ev.metrics_history);
           const lm = ev.metrics_history[ev.metrics_history.length - 1];
+          if (lm && typeof lm === "object") window.__lastFinalMetrics = { ...lm };
           updateFinanceSnapshot(lm || {});
         } else {
           updateFinanceSnapshot({});
         }
         if (ev.header) {
           const h = ev.header;
+          window.__lastHeaderInfo = { ...h };
           document.getElementById("headerInfo").innerHTML = [
             ["场景", h.name],
             ["类型", h.exercise_type],
             ["ticks", h.ticks],
             ["seed", h.seed],
             ["行政层级", h.admin_level],
-            ["地名", h.jurisdiction_name || "—"],
+            ["地名", h.jurisdiction_name || "-"],
             ["发行方类型", h.issuer_archetype],
             ["brand_equity", h.brand_equity],
-            ["议题刚需proxy", h.problem_salience != null ? h.problem_salience : "—"],
+            ["议题刚需proxy", h.problem_salience != null ? h.problem_salience : "-"],
           ]
-            .map(([k, v]) => `<span class="pill">${k}: ${v}</span>`)
+            .map(([k, v]) => `<span class="pill"><span>${escapeHtml(metricLabel(k))}</span>: <span data-no-translate>${escapeHtml(String(v ?? "-"))}</span></span>`)
             .join(" ");
         }
         renderHorizon(ev.horizon_forecast || {});
@@ -2023,17 +2682,21 @@
         let pauseLabel = "暂停 · 等待处置方案";
         if (pk === "risk_milestone") pauseLabel = "暂停 · 内部风险盘点（已达关键推演次数）";
         if (pk === "desk_review") pauseLabel = "暂停 · 待确认可行性（未确认则不继续 tick）";
+        if (pk === "manual_pause") pauseLabel = "暂停 · 手动请求已生效（等待新决策）";
         document.getElementById("status").innerHTML =
-          '<span style="color:#e0af68">' + pauseLabel + "</span>" + sec;
+          '<span style="color:#886031">' + pauseLabel + "</span>" + sec;
         document.getElementById("inlineHint").textContent =
           pk === "desk_review"
             ? "桌面已研判：可确认继续，或「评估另一套 / 修改并重评」。弹窗右上角可载入历史方案。"
+            : pk === "manual_pause"
+              ? "已按请求暂停：请输入新的决策内容后提交续跑。系统会继承此前运行态势并叠加新决策。"
             : pk === "risk_milestone"
               ? "已达关键推演次数：请填应对方案（可多套）；研判后需确认才继续。"
               : "已暂停：可填多套方案（--- 分隔）；研判后需确认才继续。";
         document.getElementById("crisisBackdrop").classList.add("show");
         return "stop";
       } else if (ph === "error") {
+        window.__runControlToken = null;
         document.getElementById("errBox").style.display = "block";
         document.getElementById("errBox").textContent =
           (ev.error || "未知错误") + (ev.traceback ? "\n\n" + ev.traceback : "");
@@ -2049,9 +2712,25 @@
       const ac = new AbortController();
       window.__peopleStreamAbort = ac;
       const stopBtn = document.getElementById("stopStreamBtn");
+      const pauseBtn = document.getElementById("requestPauseBtn");
+      const pubStop = document.getElementById("publicStopStreamBtn");
+      const pubPause = document.getElementById("publicRequestPauseBtn");
+      const isPublicRun = window.__uiMode === "public";
       if (stopBtn) {
         stopBtn.style.display = "inline-block";
         stopBtn.disabled = false;
+      }
+      if (pauseBtn) {
+        pauseBtn.style.display = "inline-block";
+        pauseBtn.disabled = false;
+      }
+      if (isPublicRun && pubStop) {
+        pubStop.style.display = "inline-block";
+        pubStop.disabled = false;
+      }
+      if (isPublicRun && pubPause) {
+        pubPause.style.display = "inline-block";
+        pubPause.disabled = false;
       }
       try {
         const res = await fetch(url, {
@@ -2088,16 +2767,19 @@
       } catch (e) {
         if (e && e.name === "AbortError") {
           appendLiveLog(
-            "—— 已停止：已断开流式连接（服务器端可能仍在收尾；若未到暂停点则无 checkpoint） ——",
+            "-- 已停止：已断开流式连接（服务器端可能仍在收尾；若未到暂停点则无 checkpoint） --",
           );
           document.getElementById("status").innerHTML =
-            '<span style="color:#e0af68">已中止</span>（可再次开始运行）';
+            '<span style="color:#886031">已中止</span>（可再次开始运行）';
           return "aborted";
         }
         throw e;
       } finally {
         window.__peopleStreamAbort = null;
         if (stopBtn) stopBtn.style.display = "none";
+        if (pauseBtn) pauseBtn.style.display = "none";
+        if (pubStop) pubStop.style.display = "none";
+        if (pubPause) pubPause.style.display = "none";
         releaseStreamLocks();
       }
     }
@@ -2142,7 +2824,7 @@
     document.getElementById("decisionEvalOnlyBtn").addEventListener("click", async () => {
       const text = document.getElementById("decisionLayerDraft").value.trim();
       if (!text) {
-        alert("请填写草案后再评估");
+        alert("请填写决策内容后再点「评估本决策」。");
         return;
       }
       const out = document.getElementById("decisionEvalResult");
@@ -2229,12 +2911,12 @@
     document.getElementById("decisionConfirmExecBtn").addEventListener("click", async () => {
       const payload = window.__lastPlanEvaluatePayload;
       if (!payload || payload.ok === false) {
-        alert("请先点击「仅评估本草案」并等待成功。");
+        alert("请先点击「评估本决策」并等待成功。");
         return;
       }
       const text = document.getElementById("decisionLayerDraft").value.trim();
       if (!text) {
-        alert("草案文本为空。");
+        alert("决策文本为空。");
         return;
       }
       const out = document.getElementById("decisionEvalResult");
@@ -2304,15 +2986,17 @@
           hint.innerHTML =
             "<strong>已确认执行。</strong> " +
             (cm.due_tick != null ? "将在第 " + cm.due_tick + " tick 提示约定检视。" : "") +
-            " 本套草案已记入弹窗内「历史方案」，上方草案框已清空，可写下一套后点「仅评估」。";
+            " 本套决策已记入弹窗内「历史方案」，上方决策框已清空，可写下一套后点「评估本决策」。";
 
         prependDecisionHistoryEntry({
-          status: "已确认·内部草案",
+          status: "已确认·内部决策",
           plain_full: text,
           plain_excerpt: text.slice(0, 200),
         });
         document.getElementById("decisionLayerDraft").value = "";
         document.getElementById("decisionLayerDraft").focus();
+        const pdt = document.getElementById("publicDecisionText");
+        if (pdt) pdt.value = "";
         window.__lastPlanEvaluatePayload = null;
         document.getElementById("decisionEvalFollowup").style.display = "none";
         document.getElementById("historyPlanPick").value = "";
@@ -2334,7 +3018,7 @@
       document.getElementById("decisionLayerDraft").value = "";
       document.getElementById("decisionLayerDraft").focus();
       const el = document.getElementById("evalCommitmentHint");
-      if (el) el.textContent = "请重写草案后再点「仅评估」；上方下拉仍可载入历史候选。";
+      if (el) el.textContent = "请重写决策后再点「评估本决策」；上方下拉仍可载入历史候选。";
     });
 
     document.getElementById("draftPlanCandidateSelect").addEventListener("change", function () {
@@ -2358,11 +3042,81 @@
       if (!ac) return;
       const sb = document.getElementById("stopStreamBtn");
       if (sb) sb.disabled = true;
+      const ps = document.getElementById("publicStopStreamBtn");
+      if (ps) ps.disabled = true;
       ac.abort();
+    });
+
+    document.getElementById("publicStopStreamBtn").addEventListener("click", () => {
+      document.getElementById("stopStreamBtn").click();
+    });
+
+    document.getElementById("publicRequestPauseBtn").addEventListener("click", () => {
+      document.getElementById("requestPauseBtn").click();
+    });
+
+    document.getElementById("requestPauseBtn").addEventListener("click", async () => {
+      const tok = (window.__runControlToken || "").trim();
+      if (!tok) {
+        document.getElementById("status").textContent = "当前无可暂停的运行会话。";
+        return;
+      }
+      const btn = document.getElementById("requestPauseBtn");
+      const pubP = document.getElementById("publicRequestPauseBtn");
+      if (btn) btn.disabled = true;
+      if (pubP) pubP.disabled = true;
+      const bodyJson = JSON.stringify({
+        run_control_token: tok,
+        reason: "用户需要暂停输入新决策并结合既有态势续跑",
+      });
+      try {
+        await ensurePeopleApiBase();
+        const urls = [peopleApiUrl("/api/run/pause-request"), peopleApiUrl("/api/run-control/pause")];
+        let lastErr = "请求暂停失败";
+        let ok = false;
+        for (const url of urls) {
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: bodyJson,
+          });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j.ok !== false) {
+            ok = true;
+            break;
+          }
+          const d = j.detail;
+          const msg =
+            typeof d === "string" ? d : Array.isArray(d) ? JSON.stringify(d) : j.error || "请求暂停失败";
+          lastErr = msg;
+          if (r.status !== 404) break;
+        }
+        if (!ok) {
+          const low = String(lastErr).toLowerCase();
+          if (
+            lastErr === "Not Found" ||
+            low.includes("not found") ||
+            lastErr.includes("未注册")
+          ) {
+            lastErr =
+              "后端没有「请求暂停」接口（多为未重启服务）。请关闭当前 run_web/uvicorn 窗口后重新运行 run_web.cmd，再点一次暂停。";
+          }
+          throw new Error(lastErr);
+        }
+        appendLiveLog("-- 已发送手动暂停请求：将在安全点暂停并生成 checkpoint --");
+        document.getElementById("status").innerHTML =
+          '<span style="color:#886031">暂停请求已发送</span>（等待当前轮到达安全点）';
+      } catch (e) {
+        document.getElementById("status").textContent = "暂停请求失败: " + String(e);
+      } finally {
+        if (btn && window.__peopleStreamAbort) btn.disabled = false;
+        if (pubP && window.__peopleStreamAbort) pubP.disabled = false;
+      }
     });
 
     document.getElementById("runBtn").onclick = async () => {
       window.__peopleCheckpoint = null;
+      window.__runControlToken = null;
       window.__peoplePauseKind = null;
       window.__planEvaluations = [];
       fillHistorySelect([]);
@@ -2529,6 +3283,289 @@
       }
     };
 
+    const SWAN_MANUAL_VAL = "__swan_manual__";
+    const SWAN_CUSTOM_VAL = "__swan_custom__";
+    const __swanSelectPrev = { blackSwanPreset: "", publicQuickSwanPreset: "", runtimeSwanPreset: "" };
+
+    function ensureManualSwanOption(sel) {
+      if (!sel || sel.querySelector(`option[value="${SWAN_MANUAL_VAL}"]`)) return;
+      const o = document.createElement("option");
+      o.value = SWAN_MANUAL_VAL;
+      o.textContent = "手动输入…";
+      sel.appendChild(o);
+    }
+
+    function insertCustomSwanOption(sel, label, selected) {
+      if (!sel) return;
+      const old = sel.querySelector(`option[value="${SWAN_CUSTOM_VAL}"]`);
+      if (old) old.remove();
+      const o = document.createElement("option");
+      o.value = SWAN_CUSTOM_VAL;
+      o.textContent = label;
+      const manualOpt = sel.querySelector(`option[value="${SWAN_MANUAL_VAL}"]`);
+      if (manualOpt) sel.insertBefore(o, manualOpt);
+      else sel.appendChild(o);
+      if (selected) sel.value = SWAN_CUSTOM_VAL;
+    }
+
+    function removeCustomSwanFromAll() {
+      ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+        const s = document.getElementById(id);
+        if (!s) return;
+        const rem = s.querySelector(`option[value="${SWAN_CUSTOM_VAL}"]`);
+        if (rem) rem.remove();
+        if (s.value === SWAN_CUSTOM_VAL) s.value = "";
+      });
+      window.__swanCustomActive = false;
+      window.__swanCustomLabel = "";
+    }
+
+    function syncSwanSelectsToPresetId(sourceId, presetId) {
+      ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+        if (id === sourceId) return;
+        const s = document.getElementById(id);
+        if (!s) return;
+        if ([...s.options].some((o) => o.value === presetId)) s.value = presetId;
+      });
+    }
+
+    function openSwanManualModal() {
+      document.getElementById("swanManualTitle").value = (document.getElementById("blackSwanTitle").value || "").trim();
+      document.getElementById("swanManualDetail").value = (document.getElementById("blackSwanDetail").value || "").trim();
+      document.getElementById("swanManualSeverity").value =
+        document.getElementById("blackSwanSeverity").value || "1";
+      const bd = document.getElementById("swanManualBackdrop");
+      if (bd) bd.classList.add("show");
+    }
+
+    function closeSwanManualModal() {
+      const bd = document.getElementById("swanManualBackdrop");
+      if (bd) bd.classList.remove("show");
+    }
+
+    function confirmSwanManualFromModal() {
+      const title = (document.getElementById("swanManualTitle").value || "").trim();
+      if (!title) {
+        alert("请填写事件标题。");
+        return;
+      }
+      const detail = (document.getElementById("swanManualDetail").value || "").trim();
+      const sev = Number(document.getElementById("swanManualSeverity").value || "1");
+      document.getElementById("blackSwanTitle").value = title;
+      document.getElementById("blackSwanDetail").value = detail;
+      document.getElementById("blackSwanSeverity").value = String(Number.isFinite(sev) ? sev : 1);
+      window.__swanCustomActive = true;
+      window.__swanCustomLabel = "手动: " + title.slice(0, 26) + (title.length > 26 ? "…" : "");
+      ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+        const s = document.getElementById(id);
+        if (!s) return;
+        ensureManualSwanOption(s);
+        insertCustomSwanOption(s, window.__swanCustomLabel, true);
+        __swanSelectPrev[id] = SWAN_CUSTOM_VAL;
+      });
+      closeSwanManualModal();
+    }
+
+    function onSwanPresetSelectChange(ev) {
+      const el = ev.target;
+      if (!el || !el.id) return;
+      const v = (el.value || "").trim();
+      if (v === SWAN_MANUAL_VAL) {
+        const prev = Object.prototype.hasOwnProperty.call(__swanSelectPrev, el.id) ? __swanSelectPrev[el.id] : "";
+        el.value = prev || "";
+        openSwanManualModal();
+        return;
+      }
+      __swanSelectPrev[el.id] = v;
+      if (v === SWAN_CUSTOM_VAL) {
+        syncSwanSelectsToPresetId(el.id, SWAN_CUSTOM_VAL);
+        ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+          __swanSelectPrev[id] = SWAN_CUSTOM_VAL;
+        });
+        return;
+      }
+      if (v && v !== SWAN_CUSTOM_VAL && v !== SWAN_MANUAL_VAL) {
+        removeCustomSwanFromAll();
+        ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+          ensureManualSwanOption(document.getElementById(id));
+        });
+        document.getElementById("blackSwanTitle").value = "";
+        document.getElementById("blackSwanDetail").value = "";
+        syncSwanSelectsToPresetId(el.id, v);
+        ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+          const s = document.getElementById(id);
+          if (s) __swanSelectPrev[id] = s.value;
+        });
+      }
+    }
+
+    function attachSwanPresetSyncListeners() {
+      ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", onSwanPresetSelectChange);
+      });
+      document.getElementById("swanManualConfirmBtn")?.addEventListener("click", confirmSwanManualFromModal);
+      document.getElementById("swanManualCancelBtn")?.addEventListener("click", () => closeSwanManualModal());
+      document.getElementById("swanManualBackdrop")?.addEventListener("click", (e) => {
+        if (e.target.id === "swanManualBackdrop") closeSwanManualModal();
+      });
+    }
+
+    async function loadBlackSwanPresets() {
+      const sel = document.getElementById("blackSwanPreset");
+      if (!sel) return;
+      const keepCustom = window.__swanCustomActive === true;
+      const keepLabel = (window.__swanCustomLabel || "").trim();
+      try {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/black-swan/presets"));
+        const j = await r.json();
+        if (!r.ok || !j.ok || !Array.isArray(j.presets)) return;
+        const html =
+          '<option value="">- 选择预设 -</option>' +
+          j.presets.map((p) => `<option value="${p.id}">${p.title || p.id}</option>`).join("");
+        ["blackSwanPreset", "publicQuickSwanPreset", "runtimeSwanPreset"].forEach((id) => {
+          const s = document.getElementById(id);
+          if (!s) return;
+          s.innerHTML = html;
+          ensureManualSwanOption(s);
+          if (keepCustom && keepLabel) {
+            insertCustomSwanOption(s, keepLabel, true);
+            s.value = SWAN_CUSTOM_VAL;
+          }
+        });
+        if (keepCustom && keepLabel) {
+          __swanSelectPrev.blackSwanPreset = SWAN_CUSTOM_VAL;
+          __swanSelectPrev.publicQuickSwanPreset = SWAN_CUSTOM_VAL;
+          __swanSelectPrev.runtimeSwanPreset = SWAN_CUSTOM_VAL;
+        }
+      } catch (_) {}
+    }
+
+    function resolveBlackSwanPresetId() {
+      const ids = ["runtimeSwanPreset", "blackSwanPreset", "publicQuickSwanPreset"];
+      for (const id of ids) {
+        const v = (document.getElementById(id)?.value || "").trim();
+        if (v && v !== SWAN_MANUAL_VAL && v !== SWAN_CUSTOM_VAL) return v;
+      }
+      return "";
+    }
+
+    function buildBlackSwanBodyBase() {
+      const preset = resolveBlackSwanPresetId();
+      const title = (document.getElementById("blackSwanTitle").value || "").trim();
+      const detail = (document.getElementById("blackSwanDetail").value || "").trim();
+      const sev = Number(document.getElementById("blackSwanSeverity").value || "1");
+      const body = { severity: Number.isFinite(sev) ? sev : 1.0 };
+      if (preset) body.preset_id = preset;
+      if (title) body.title = title;
+      if (detail) body.detail = detail;
+      return body;
+    }
+
+    document.getElementById("blackSwanInjectPaused").onclick = async () => {
+      const tok = window.__peopleCheckpoint;
+      const st = document.getElementById("blackSwanStatus");
+      st.textContent = "";
+      if (!tok) {
+        st.textContent = "无 checkpoint：请先运行至暂停。";
+        return;
+      }
+      const body = { ...buildBlackSwanBodyBase(), checkpoint_token: tok };
+      if (!body.preset_id && !body.title) {
+        st.textContent = "请先选预设或填写标题。";
+        return;
+      }
+      try {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/black-swan/inject"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          st.textContent = j.detail || j.error || "注入失败";
+          return;
+        }
+        if (j.checkpoint_token) window.__peopleCheckpoint = j.checkpoint_token;
+        st.textContent = "已注入并切换新 checkpoint";
+      } catch (e) {
+        st.textContent = String(e);
+      }
+    };
+
+    function formatApiDetail(d) {
+      if (d == null) return "";
+      if (typeof d === "string") return d;
+      if (Array.isArray(d)) return d.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join("; ");
+      return String(d);
+    }
+
+    document.getElementById("blackSwanInjectRuntimeBtn").onclick = async () => {
+      const st = document.getElementById("blackSwanRuntimeHint");
+      st.textContent = "";
+      const base = buildBlackSwanBodyBase();
+      if (!base.preset_id && !base.title) {
+        st.textContent = "请先在左侧「预设」里选一项，或在危机弹窗里展开「黑天鹅注入」填写自定义标题。";
+        appendLiveLog("! 黑天鹅：未选预设且无标题，已取消。");
+        return;
+      }
+      const rtok = (window.__runControlToken || "").trim();
+      const cktok = (window.__peopleCheckpoint || "").trim();
+      if (!rtok && !cktok) {
+        st.textContent = "请先开始流式运行；暂停后会自动改用当前 checkpoint 注入。";
+        appendLiveLog("! 黑天鹅：无活动会话且无 checkpoint。");
+        return;
+      }
+      try {
+        await ensurePeopleApiBase();
+        const url = peopleApiUrl("/api/black-swan/inject");
+        const post = (body) =>
+          fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+        let body = { ...base };
+        let mode = "runtime";
+        if (rtok) body.run_control_token = rtok;
+        else {
+          body.checkpoint_token = cktok;
+          mode = "checkpoint";
+        }
+        let r = await post(body);
+        let j = await r.json().catch(() => ({}));
+        if ((!r.ok || j.ok === false) && r.status === 404 && rtok && cktok) {
+          const nb = { ...base, checkpoint_token: cktok };
+          mode = "checkpoint";
+          r = await post(nb);
+          j = await r.json().catch(() => ({}));
+        }
+        if (!r.ok || j.ok === false) {
+          const msg = formatApiDetail(j.detail) || j.error || "注入失败";
+          st.textContent = msg;
+          appendLiveLog("! 黑天鹅注入失败: " + msg);
+          return;
+        }
+        if (mode === "checkpoint" && j.checkpoint_token) window.__peopleCheckpoint = j.checkpoint_token;
+        st.textContent =
+          mode === "runtime"
+            ? "已排队注入，下一 tick 开头处理（当前 tick 若在跑 LLM 请稍等）。"
+            : "已注入并更新 checkpoint（与弹窗内「注入到当前暂停点」相同）。";
+        appendLiveLog(
+          "黑天鹅: 已提交注入 [" +
+            mode +
+            "] " +
+            (base.preset_id || base.title || "") +
+            (j.queued ? " (queued)" : ""),
+        );
+      } catch (e) {
+        st.textContent = String(e);
+        appendLiveLog("! 黑天鹅注入异常: " + String(e));
+      }
+    };
+
     document.getElementById("crisisSubmit").onclick = async () => {
       const tok = window.__peopleCheckpoint;
       const sol = document.getElementById("crisisSolution").value.trim();
@@ -2593,6 +3630,205 @@
         document.getElementById("crisisSubmit").disabled = false;
         document.getElementById("confirmProceedBtn").disabled = false;
         document.getElementById("inlineResumeBtn").disabled = false;
+      }
+    };
+
+    document.getElementById("pickProfessionalMode").onclick = () => setUiMode("professional");
+    document.getElementById("pickPublicMode").onclick = () => setUiMode("public");
+    document.getElementById("switchToProfessionalBtn").onclick = () => setUiMode("professional");
+
+    document.getElementById("publicApplyBtn").onclick = () => {
+      applyPublicModeToRun();
+      const h = document.getElementById("publicInferHint");
+      if (h) h.textContent = "已应用到本次运行。";
+    };
+    document.getElementById("publicHistoryBtn").onclick = () => openPublicHistory(true);
+    document.getElementById("publicHistoryCloseBtn").onclick = () =>
+      document.getElementById("publicHistoryBackdrop").classList.remove("show");
+
+    document.getElementById("publicRunBtn").onclick = () => {
+      applyPublicModeToRun();
+      document.getElementById("runBtn").click();
+    };
+    document.getElementById("publicGuideBtn").onclick = () => openPublicGuide();
+    document.getElementById("publicGuideCloseBtn").onclick = () => closePublicGuide();
+    document.getElementById("publicGuidePrevBtn").onclick = () =>
+      renderPublicGuideStep((window.__publicGuideStep || 0) - 1);
+    document.getElementById("publicGuideNextBtn").onclick = () =>
+      renderPublicGuideStep((window.__publicGuideStep || 0) + 1);
+    document.getElementById("publicGuideActBtn").onclick = () => {
+      const i = window.__publicGuideStep || 0;
+      const step = (window.__publicGuideSteps || [])[i];
+      if (step && typeof step.act === "function") step.act();
+    };
+    document.getElementById("publicGuideBackdrop").addEventListener("click", (e) => {
+      if (e.target && e.target.id === "publicGuideBackdrop") closePublicGuide();
+    });
+    document.getElementById("publicExportHtmlBtn").onclick = async () => {
+      const hint = document.getElementById("publicInferHint");
+      try {
+        if (hint) hint.textContent = "正在生成 HTML 报告…";
+        await exportCurrentReport(false);
+        if (hint) hint.textContent = "HTML 报告已打开新窗口。";
+      } catch (e) {
+        if (hint) hint.textContent = "导出失败: " + String(e);
+      }
+    };
+    document.getElementById("publicExportPdfBtn").onclick = async () => {
+      const hint = document.getElementById("publicInferHint");
+      try {
+        if (hint) hint.textContent = "正在打开打印版（可另存为 PDF）…";
+        await exportCurrentReport(true);
+        if (hint) hint.textContent = "打印窗口已打开。";
+      } catch (e) {
+        if (hint) hint.textContent = "导出失败: " + String(e);
+      }
+    };
+
+    document.getElementById("publicEvalBtn").onclick = () => {
+      applyPublicModeToRun();
+      const t = (document.getElementById("publicSceneText").value || "").trim();
+      if (t) document.getElementById("decisionLayerDraft").value = t;
+      document.getElementById("decisionEvalOnlyBtn").click();
+    };
+    document.getElementById("publicInjectDecisionBtn").onclick = () => {
+      const t = (document.getElementById("publicDecisionText").value || "").trim();
+      const hint = document.getElementById("publicDecisionHint");
+      if (!t) {
+        hint.textContent = "先输入决策。";
+        return;
+      }
+      const draft = document.getElementById("decisionLayerDraft");
+      const prev = (draft?.value || "").trim();
+      const merged = prev ? `${prev}\n\n[追加决策]\n${t}` : t;
+      if (draft) draft.value = merged;
+      // Also append to main brief so not relying on hidden expert panel.
+      const briefEl = document.getElementById("brief");
+      const bp = (briefEl?.value || "").trim();
+      if (briefEl) briefEl.value = bp ? `${bp}\n\n[追加决策]\n${t}` : t;
+      window.__publicDecisionHistory.unshift({
+        ts: new Date().toLocaleString(),
+        text: t,
+      });
+      window.__publicDecisionHistory = window.__publicDecisionHistory.slice(0, 80);
+      savePublicDecisionHistory();
+      document.getElementById("publicDecisionText").value = "";
+      hint.textContent = "已追加，后续推演会继承之前影响。";
+    };
+    document.getElementById("publicDecisionEvaluateBtn").onclick = async () => {
+      const hint = document.getElementById("publicDecisionHint");
+      const box = document.getElementById("publicDecisionEvalBox");
+      const t = (document.getElementById("publicDecisionText").value || "").trim();
+      if (t) {
+        const draft = document.getElementById("decisionLayerDraft");
+        if (draft) draft.value = t;
+      }
+      const text = (document.getElementById("decisionLayerDraft")?.value || "").trim();
+      if (!text) {
+        hint.textContent = "先输入或追加一条决策。";
+        return;
+      }
+      hint.textContent = "正在评估…";
+      document.getElementById("decisionEvalOnlyBtn").click();
+      setTimeout(() => {
+        const src = document.getElementById("decisionEvalResult");
+        const s = (src?.textContent || "").trim();
+        if (s) {
+          box.style.display = "block";
+          box.textContent = s.slice(0, 1800);
+          hint.textContent = "评估完成，可确认执行。";
+        } else {
+          hint.textContent = "评估处理中，请稍后。";
+        }
+      }, 1200);
+    };
+    document.getElementById("publicDecisionConfirmBtn").onclick = async () => {
+      const hint = document.getElementById("publicDecisionHint");
+      hint.textContent = "确认执行中…";
+      document.getElementById("decisionConfirmExecBtn").click();
+      setTimeout(() => {
+        const pdt = document.getElementById("publicDecisionText");
+        if (pdt) pdt.value = "";
+        hint.textContent = "已执行，可继续输入下一条决策。";
+      }, 1200);
+    };
+    document.getElementById("publicInjectSwanBtn").onclick = async () => {
+      const hint = document.getElementById("publicSwanHint");
+      hint.textContent = "";
+      const base = buildBlackSwanBodyBase();
+      if (!base.preset_id && !base.title) {
+        hint.textContent = "请先选库内预设，或选「手动输入…」填写标题。";
+        return;
+      }
+      const body = { ...base };
+      if (window.__runControlToken) body.run_control_token = window.__runControlToken;
+      else if (window.__peopleCheckpoint) body.checkpoint_token = window.__peopleCheckpoint;
+      else {
+        hint.textContent = "请先开始推演（运行中或暂停态都可以注入）。";
+        return;
+      }
+      try {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/black-swan/inject"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          hint.textContent = formatApiDetail(j.detail) || j.error || "注入失败";
+          return;
+        }
+        if (j.checkpoint_token) window.__peopleCheckpoint = j.checkpoint_token;
+        hint.textContent = j.queued ? "已注入到运行队列（下一 tick 生效）。" : "已注入到当前暂停快照。";
+      } catch (e) {
+        hint.textContent = String(e);
+      }
+    };
+    document.getElementById("publicSpecialLaunchBtn").onclick = () => runSpecialEvaluation("new_product_launch");
+    document.getElementById("publicSpecialMnaBtn").onclick = () => runSpecialEvaluation("acquisition_mna");
+
+    document.getElementById("publicInferBtn").onclick = async () => {
+      const text = (document.getElementById("publicSceneText").value || "").trim();
+      const hint = document.getElementById("publicInferHint");
+      const box = document.getElementById("publicInferenceBox");
+      if (!text) {
+        hint.textContent = "请先输入场景描述。";
+        return;
+      }
+      hint.textContent = "正在推断…";
+      try {
+        await ensurePeopleApiBase();
+        const r = await fetch(peopleApiUrl("/api/public-mode/infer"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scenario_text: text,
+            ...apiFields(),
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) {
+          hint.textContent = j.detail || j.error || "推断失败";
+          return;
+        }
+        window.__publicInference = j;
+        renderDepartmentChecks(j.departments || []);
+        box.style.display = "block";
+        box.textContent =
+          `识别结果：${j.inferred_mode}（置信度 ${Math.round(Number(j.confidence || 0) * 100)}%）\n` +
+          `判断依据：${j.reason || "-"}\n` +
+          `推荐模式：${j.recommended_mode || "professional"}\n` +
+          `渠道特征：${(j.media_channels || []).join("、") || "-"}\n` +
+          `建议相关部门：${(j.departments || []).join("、") || "-"}\n` +
+          `建议动作：\n- ${(j.next_actions || []).join("\n- ")}`;
+        if (j.recommended_mode === "professional") {
+          hint.textContent = "该场景建议专业模式（政策/大型企业语境）。";
+        } else {
+          hint.textContent = "适合大众模式，已生成可执行建议。";
+        }
+      } catch (e) {
+        hint.textContent = String(e);
       }
     };
 
@@ -2699,17 +3935,24 @@
             '<span style="color:var(--ok)">ensemble 完成</span>（结果见下方）';
         } else if (ensAborted) {
           document.getElementById("status").innerHTML =
-            '<span style="color:#e0af68">已中止</span>（可再次估计终局分布）';
+            '<span style="color:#886031">已中止</span>（可再次估计终局分布）';
         }
       }
     };
 
     initNetwork();
+    renderEventBank();
+    bindTimelineDnD();
+    renderTimelineLanes();
+    renderDepartmentChecks([]);
+    attachSwanPresetSyncListeners();
+    loadBlackSwanPresets();
     loadScenarios()
       .then(() => {
-        if (!localStorage.getItem("people_wizard_intro_done")) {
-          openScenarioWizard();
-        }
+        // The workspace is usable immediately; mode and wizard remain explicit controls.
+        let preferredMode = "professional";
+        try { preferredMode = localStorage.getItem("people_ui_mode") || preferredMode; } catch (_) {}
+        setUiMode(preferredMode);
       })
       .catch((e) => {
         document.getElementById("status").textContent = "无法加载场景列表: " + e;

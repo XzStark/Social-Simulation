@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from people.data_governance import impute_missing_rows
+
 
 def read_metrics_csv(path: str | Path) -> list[dict[str, Any]]:
     p = Path(path)
@@ -13,7 +15,10 @@ def read_metrics_csv(path: str | Path) -> list[dict[str, Any]]:
         rows = []
         for row in r:
             rows.append({k.strip(): (v.strip() if isinstance(v, str) else v) for k, v in row.items()})
-    return rows
+    # v0 数据治理：对常用数值列做缺失值处理（不强制丢行）
+    # 注：compare_tick_series 仍会按需过滤无法解析为 float 的值。
+    keys = [k for k in (rows[0].keys() if rows else []) if k != "tick"]
+    return impute_missing_rows(rows, keys=keys, strategy="ffill")
 
 
 def _float_row(d: dict[str, Any], key: str) -> float | None:

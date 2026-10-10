@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="people 政企决策演练：在安全的情境中预演政策与企业方案，观察公众、市场与机构反应，进行压力测试与内部复盘。"
+    />
+    <meta name="theme-color" content="#f6f3ee" />
+    <title>people | See the impact before you act</title>
+    <link
+      rel="preload"
+      href="/people/assets/dm-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/people/assets/design.css" />
+    <script src="/people/assets/translations.js" defer></script>
+    <script src="/people/assets/i18n.js" defer></script>
+    <script src="/people/assets/landing.js" defer></script>
+  </head>
+  <body class="landing">
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="people home"
+        >people<span>Decision simulation</span></a
+      >
+      <div class="language-switch" role="group" aria-label="Language / 语言">
+        <button
+          type="button"
+          data-language="en"
+          aria-pressed="true"
+          aria-label="English"
+        >
+          EN</button
+        ><button
+          type="button"
+          data-language="zh"
+          aria-pressed="false"
+          aria-label="中文"
+        >
+          中文
+        </button>
+      </div>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="desktop-link" href="#approach">The process</a>
+        <a class="desktop-link" href="#scenarios">Use cases</a>
+        <a class="nav-entry" href="/people/"
+          >Open workspace <span class="arrow" aria-hidden="true">↗</span></a
+        >
+      </nav>
+    </header>
+    <main id="main">
+      <section class="landing-hero content-width" aria-labelledby="hero-title">
+        <div class="hero-copy" data-reveal>
+          <p class="eyebrow">SIMULATION FOR BETTER DECISIONS</p>
+          <h1 id="hero-title">See the impact.<span>Before you act.</span></h1>
+          <p class="intro">
+            Rehearse policy and business decisions.<br />Explore how
+            institutions, markets, and communities may respond.
+          </p>
+          <div class="hero-actions">
+            <a class="cta" href="/people/"
+              >Start a simulation
+              <span class="arrow" aria-hidden="true">↗</span></a
+            >
+            <a class="text-link" href="#approach"
+              >Explore the process <span aria-hidden="true">↓</span></a
+            >
+          </div>
+        </div>
+        <figure class="hero-visual" data-reveal>
+          <img
+            src="/people/assets/decision-city.webp"
+            width="1200"
+            height="800"
+            fetchpriority="high"
+            alt="An original architectural city model connecting civic institutions, businesses, and communities through multiple pathways"
+          />
+          <figcaption>
+            <span>Institutions. Markets. Communities. Connected.</span
+            ><span>CONCEPTUAL CITY MODEL</span>
+          </figcaption>
+        </figure>
+      </section>
+      <div class="content-width">
+        <div
+          class="scope-strip"
+          aria-label="Decision dimensions explored by the platform"
+        >
+          <p>One decision. Many perspectives.</p>
+          <div>
+            <strong>Public response</strong
+            ><span>Acceptance and public sentiment</span>
+          </div>
+          <div>
+            <strong>Market dynamics</strong
+            ><span>Brand trust and delivery pressure</span>
+          </div>
+          <div>
+            <strong>Institutional capacity</strong
+            ><span>Resources and coordination</span>
+          </div>
+        </div>
+      </div>
+      <section
+        class="approach content-width"
+        id="approach"
+        aria-labelledby="approach-title"
+      >
+        <div class="approach-heading" data-reveal>
+          <h2 id="approach-title">
+            Complex realities.<br />A space to think them through.
+          </h2>
+          <p>
+            A rehearsal grounded in real constraints. Explore competing
+            perspectives, examine a proposal, and reassess as conditions change.
+          </p>
+        </div>
+        <div class="approach-list">
+          <article class="approach-item" data-reveal>
+            <div>
+              <h3>Set the context</h3>
+              <p>
+                Define the policy or business proposal. Add local context,
+                institutional conditions, and resources to ground the rehearsal
+                in a specific problem.
+              </p>
+            </div>
+          </article>
+          <article class="approach-item" data-reveal>
+            <div>
+              <h3>Observe the responses</h3>
+              <p>
+                Follow communities, media, regulators, and partners round by
+                round. Compare their actions with changing indicators and
+                emerging outlooks.
+              </p>
+            </div>
+          </article>
+          <article class="approach-item" data-reveal>
+            <div>
+              <h3>Reassess the next move</h3>
+              <p>
+                Pause at critical moments, assess a response, and continue. Run
+                multiple rehearsals to compare outcome distributions and risks.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section
+        class="scenario-section"
+        id="scenarios"
+        aria-labelledby="scenario-title"
+      >
+        <div class="content-width">
+          <div class="scenario-top" data-reveal>
+            <h2 id="scenario-title">For decisions with real trade-offs.</h2>
+            <div class="scenario-switch" role="tablist" aria-label="Use cases">
+              <button
+                id="policy-tab"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="policy-story"
+              >
+                Government & policy
+              </button>
+              <button
+                id="business-tab"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="business-story"
+                tabindex="-1"
+              >
+                Business & markets
+              </button>
+            </div>
+          </div>
+          <div
+            id="policy-story"
+            role="tabpanel"
+            aria-labelledby="policy-tab"
+            class="scenario-story"
+          >
+            <div>
+              <h3>
+                Before a policy takes effect,<br />consider every perspective.
+              </h3>
+              <p>
+                Account for administrative levels, local context, and
+                implementation. Explore public acceptance, frontline pressure,
+                and coordination before discussing transition plans.
+              </p>
+              <ul class="scenario-tags">
+                <li>Policy stress testing</li>
+                <li>Public affairs assessment</li>
+                <li>Crisis response rehearsal</li>
+              </ul>
+            </div>
+            <div
+              class="scenario-model"
+              aria-label="Policy proposals are assessed through public and institutional feedback"
+            >
+              <div class="model-group">
+                <div>
+                  <strong>Policy proposal</strong
+                  ><small>Objectives, boundaries, implementation</small>
+                </div>
+                <div>
+                  <strong>Local context</strong
+                  ><small>Communities and resource constraints</small>
+                </div>
+              </div>
+              <span aria-hidden="true">→</span>
+              <div class="model-group">
+                <div>
+                  <strong>Public & institutional response</strong
+                  ><small>Sentiment, acceptance, capacity</small>
+                </div>
+                <div>
+                  <strong>Proposal assessment</strong
+                  ><small>Feedback, adjustment, rehearsal</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            id="business-story"
+            role="tabpanel"
+            aria-labelledby="business-tab"
+            class="scenario-story"
+            hidden
+          >
+            <div>
+              <h3>As markets change,<br />examine your next move.</h3>
+              <p>
+                Explore product launches, brand communication, and delivery
+                constraints. Rehearse how consumers, regulators, partners, and
+                competitors may respond.
+              </p>
+              <ul class="scenario-tags">
+                <li>Launch rehearsal</li>
+                <li>Brand and sentiment risks</li>
+                <li>Strategy comparison</li>
+              </ul>
+            </div>
+            <div
+              class="scenario-model"
+              aria-label="Business proposals are assessed through market feedback and risk comparison"
+            >
+              <div class="model-group">
+                <div>
+                  <strong>Business proposal</strong
+                  ><small>Pricing, channels, communication</small>
+                </div>
+                <div>
+                  <strong>Business conditions</strong
+                  ><small>Brand, capacity, funding</small>
+                </div>
+              </div>
+              <span aria-hidden="true">→</span>
+              <div class="model-group">
+                <div>
+                  <strong>Market & partner response</strong
+                  ><small>Consumers, competitors, regulators</small>
+                </div>
+                <div>
+                  <strong>Risk comparison</strong
+                  ><small>Multiple runs and outcome distributions</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        class="closing-cta content-width"
+        aria-labelledby="closing-title"
+      >
+        <div>
+          <p class="eyebrow">YOUR NEXT DECISION</p>
+          <h2 id="closing-title">Make room for a rehearsal.</h2>
+          <p>
+            Start with your context. Explore the responses. Refine your next
+            move.
+          </p>
+        </div>
+        <a class="cta" href="/people/"
+          >Open the decision workspace
+          <i class="arrow" aria-hidden="true">↗</i></a
+        >
+      </section>
+    </main>
+    <footer class="site-footer content-width">
+      <span class="footer-brand">people</span>
+      <p>
+        Simulated scenarios support stress testing and internal assessment. They
+        do not constitute legal, investment, medical, or psychological advice.
+      </p>
+    </footer>
+  </body>
+</html>

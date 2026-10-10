@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import itertools
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -127,6 +128,126 @@ def run_calibration(
         "与真值对比摘要": best_report,
         "全部尝试记录": history,
         "校准闭环": closure,
+    }
+
+
+def _weighted_objective_from_report(report: dict[str, Any], weights: dict[str, float] | None = None) -> float:
+    """
+    多指标加权目标：对 compare_tick_series 的输出做加权 MAE 汇总。
+    - weights=None：退化为 average_mae
+    - weights={"policy_support": 2.0, "rumor_level": 1.0}：按指标加权
+    """
+    if not isinstance(report, dict):
+        return 1e9
+    if not weights:
+        return float(average_mae(report) or 1e9)
+    wsum = 0.0
+    acc = 0.0
+    for k, w in weights.items():
+        if not w:
+            continue
+        row = report.get(k)
+        if not isinstance(row, dict):
+            continue
+        mae = row.get("mae")
+        if not isinstance(mae, (int, float)):
+            continue
+        ww = float(w)
+        wsum += abs(ww)
+        acc += abs(ww) * float(mae)
+    if wsum <= 1e-12:
+        return float(average_mae(report) or 1e9)
+    return float(acc / wsum)
+
+
+def run_calibration_bayes(
+    scenario: Scenario,
+    cfg: RunConfig,
+    *,
+    seed: int,
+    truth_rows: list[dict[str, Any]],
+    # search space: {"llm_effect_multiplier": [0.25, 0.65], "policy_from_sentiment_weight": [0.0, 0.08]}
+    space: dict[str, tuple[float, float]],
+    n_trials: int = 40,
+    metric_weights: dict[str, float] | None = None,
+    # 联合优化：对“多 seed 运行”的方差做惩罚（越大越不稳定）
+    ensemble_seeds: list[int] | None = None,
+    ensemble_var_lambda: float = 0.0,
+) -> dict[str, Any]:
+    """
+    以 optuna 做贝叶斯优化（TPE）：
+    - 支持多指标加权目标函数
+    - 可选：联合考虑 ensemble 的终局方差（稳定性惩罚）
+    """
+    try:
+        import optuna  # type: ignore
+    except Exception as e:
+        return {"error": f"缺少 optuna 依赖：{e}. 请安装 requirements.txt 后重试。"}
+
+    if not space:
+        return {"error": "space 为空：请提供待校准 realism 参数范围"}
+    keys = list(space.keys())
+    for k in keys:
+        lo, hi = space[k]
+        if not isinstance(lo, (int, float)) or not isinstance(hi, (int, float)) or float(hi) <= float(lo):
+            return {"error": f"space[{k}] 非法：需要 (low, high) 且 high>low"}
+
+    ens_seeds = list(ensemble_seeds or [])
+    if ens_seeds and seed not in ens_seeds:
+        ens_seeds = [seed] + ens_seeds
+
+    history: list[dict[str, Any]] = []
+
+    def objective(trial: Any) -> float:
+        upd: dict[str, float] = {}
+        for k in keys:
+            lo, hi = space[k]
+            upd[k] = float(trial.suggest_float(k, float(lo), float(hi)))
+        sc2 = _patch_realism(scenario, upd)
+
+        # 基准 seed 的拟合误差
+        state, _pause = run_single_simulation(sc2, cfg, seed=seed)
+        sim_rows = ensure_tick_column([dict(x) for x in state.metrics_history])
+        report = compare_tick_series(sim_rows, truth_rows)
+        base_score = _weighted_objective_from_report(report, metric_weights)
+
+        # ensemble 方差惩罚（终局/关键指标的方差 proxy）
+        var_pen = 0.0
+        if ens_seeds and ensemble_var_lambda > 0:
+            finals: list[dict[str, float]] = []
+            for sd in ens_seeds[:8]:
+                st2, _ = run_single_simulation(sc2, cfg, seed=int(sd))
+                finals.append(st2.snapshot_metrics())
+            # 仅对 weights 中出现的指标（或默认 policy_support）计算方差
+            watch = list(metric_weights.keys()) if metric_weights else ["policy_support"]
+            for mk in watch:
+                vals = [float(r.get(mk)) for r in finals if isinstance(r.get(mk), (int, float))]
+                if len(vals) >= 2:
+                    var_pen += float(statistics.pvariance(vals))
+            var_pen *= float(ensemble_var_lambda)
+
+        score = float(base_score + var_pen)
+        history.append(
+            {
+                "params": upd,
+                "score": score,
+                "base_score": base_score,
+                "var_penalty": var_pen,
+            }
+        )
+        return score
+
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials=int(max(1, n_trials)))
+    best = dict(study.best_params or {})
+    best_score = float(study.best_value)
+    sc_best = _patch_realism(scenario, {k: float(best[k]) for k in best})
+    return {
+        "ok": True,
+        "method": "bayes_optuna_tpe",
+        "best_params": best,
+        "best_score": best_score,
+        "trials": history[-min(300, len(history)) :],
     }
 
 

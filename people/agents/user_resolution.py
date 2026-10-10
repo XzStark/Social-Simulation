@@ -41,12 +41,25 @@ SYSTEM_PRODUCT = (
   "feasibility_notes": "string",
   "involved_functions": ["string", ...],
   "policy_equivalent_steps": "",
-  "estimated_timeline_cn": "string"
+  "estimated_timeline_cn": "string",
+  "safety_score": 0,
+  "safety_summary": "string",
+  "risk_items": [
+    {{
+      "risk_level": "high" | "medium" | "low",
+      "risk_name": "string",
+      "impact": "string",
+      "user_action": "string"
+    }}
+  ]
 }}
 intent_bullets 最多 5 条；involved_functions 用职能部门简称（如法务合规、品牌公关、客服、供应链、财务资金、政府事务等）。
 feasibility 必须三选一；policy_equivalent_steps 产品场景填空字符串 ""。
 estimated_timeline_cn：分阶段给出**大致**周期（如 0～2 周口径冻结 / 1～3 月功能迭代 / 视监管反馈再定等），标明**演练用排序与量级**，非合同或对外承诺。
 转化方案须**显式覆盖**各职能/外包方的利害与可能抵制点（与下文「真实世界条线」一致），勿写成单一部门包办。
+safety_score：0~100（分数越高代表本次草案在当前态势下越可控）；必须给出。
+safety_summary：必须给出一句结论式话术，例如「整体风险可控，但有2个高风险坑需先调整后再执行」。
+risk_items：至少 2 条，按 high→low 排序，且每条都要给出「影响」和「用户该怎么做」。
 {_NO_GAME}
 """
     + "\n\n"
@@ -72,10 +85,23 @@ SYSTEM_STARTUP = (
   "feasibility_notes": "string",
   "involved_functions": ["string", ...],
   "policy_equivalent_steps": "",
-  "estimated_timeline_cn": "string"
+  "estimated_timeline_cn": "string",
+  "safety_score": 0,
+  "safety_summary": "string",
+  "risk_items": [
+    {{
+      "risk_level": "high" | "medium" | "low",
+      "risk_name": "string",
+      "impact": "string",
+      "user_action": "string"
+    }}
+  ]
 }}
 involved_functions 可用：创始人、产品技术、增长运营、社群、外包律师、兼职财务、投资人沟通 等；policy_equivalent_steps 填空字符串 ""。
 estimated_timeline_cn：同上，突出人手紧、外包排期与融资沟通等约束下的**阶段周期（演练估计）**。
+safety_score：0~100（越高越可控）；必须给出。
+safety_summary：给出结论句并点明高风险坑数量。
+risk_items：至少 2 条，包含风险等级/风险内容/影响/用户动作建议。
 {_NO_GAME}
 """
     + "\n\n"
@@ -102,10 +128,23 @@ SYSTEM_POLICY = (
   "feasibility_notes": "string",
   "involved_functions": ["string", ...],
   "policy_equivalent_steps": "string",
-  "estimated_timeline_cn": "string"
+  "estimated_timeline_cn": "string",
+  "safety_score": 0,
+  "safety_summary": "string",
+  "risk_items": [
+    {{
+      "risk_level": "high" | "medium" | "low",
+      "risk_name": "string",
+      "impact": "string",
+      "user_action": "string"
+    }}
+  ]
 }}
 policy_equivalent_steps 用 2～4 句说明白话意图对应到上述流程的哪些环节、先后关系。
 estimated_timeline_cn：按行政程序常见节奏给出**阶段周期（演练估计）**（如征求意见窗口、会签、试点扩围等），非对外承诺。
+safety_score：0~100（越高越可控）；必须给出。
+safety_summary：给出一句结论，并点明需先补齐的高风险坑。
+risk_items：至少 2 条，必须完整包含「风险等级 + 是什么风险 + 会有什么影响 + 用户改怎么做」。
 {_NO_GAME}
 """
     + "\n\n"
@@ -124,6 +163,7 @@ def professionalize_plain_resolution(
     plain_solution: str,
     decision_context: dict[str, Any],
     temperature: float = 0.25,
+    decision_kind: str | None = None,
 ) -> dict[str, Any] | None:
     if scenario.exercise_type == "policy":
         sys = SYSTEM_POLICY
@@ -135,6 +175,7 @@ def professionalize_plain_resolution(
         "plain_language_resolution": True,
         "exercise_type": scenario.exercise_type,
         "issuer_archetype": scenario.issuer.archetype,
+        "decision_kind": decision_kind or "general",
         "tick_when_submitted": state.tick,
         "user_plain_text": plain_solution.strip(),
         "player_brief_excerpt": (scenario.player_brief or "")[:2000],
@@ -165,6 +206,57 @@ def professionalize_plain_resolution(
         raw["policy_equivalent_steps"] = ""
     else:
         raw["policy_equivalent_steps"] = str(raw["policy_equivalent_steps"]).strip()
+    sc = raw.get("safety_score")
+    try:
+        raw["safety_score"] = int(round(float(sc)))
+    except Exception:
+        raw["safety_score"] = 60
+    raw["safety_score"] = max(0, min(100, int(raw["safety_score"])))
+    raw["safety_summary"] = str(raw.get("safety_summary") or "").strip()
+    items = raw.get("risk_items")
+    cleaned: list[dict[str, str]] = []
+    if isinstance(items, list):
+        for it in items[:8]:
+            if not isinstance(it, dict):
+                continue
+            lv = str(it.get("risk_level") or "medium").strip().lower()
+            if lv not in ("high", "medium", "low"):
+                lv = "medium"
+            nm = str(it.get("risk_name") or "").strip()
+            impact = str(it.get("impact") or "").strip()
+            act = str(it.get("user_action") or "").strip()
+            if nm or impact or act:
+                cleaned.append(
+                    {
+                        "risk_level": lv,
+                        "risk_name": nm or "未命名风险",
+                        "impact": impact,
+                        "user_action": act,
+                    }
+                )
+    if not cleaned:
+        cleaned = [
+            {
+                "risk_level": "high",
+                "risk_name": "信息不完整导致执行偏差",
+                "impact": "跨部门动作容易失焦，外部沟通与内部资源安排可能冲突。",
+                "user_action": "先补齐目标边界、预算上限与责任人，再分阶段执行。",
+            },
+            {
+                "risk_level": "medium",
+                "risk_name": "节奏与口径不一致",
+                "impact": "舆情与执行反馈可能放大摩擦，拖累支持度与信任。",
+                "user_action": "先冻结统一口径并设复盘节点，按里程碑逐步推进。",
+            },
+        ]
+    raw["risk_items"] = cleaned
+    if not raw["safety_summary"]:
+        hi = sum(1 for x in cleaned if x.get("risk_level") == "high")
+        raw["safety_summary"] = (
+            f"整体风险可控，但有{hi}个高风险坑需提前规划调整后再执行。"
+            if hi > 0
+            else "整体风险可控，建议按里程碑执行并持续监控关键风险。"
+        )
     return raw
 
 
@@ -194,4 +286,18 @@ def format_resolution_note_for_agents(d: dict[str, Any], *, scenario: Scenario |
     et = (d.get("estimated_timeline_cn") or "").strip()
     if et:
         lines.append(f"阶段周期（演练估计）：{et}")
+    ss = str(d.get("safety_summary") or "").strip()
+    if ss:
+        lines.append(f"本次安全评估：{ss}")
+    lines.append(f"安全评估分：{int(d.get('safety_score', 60))}/100")
+    risks = d.get("risk_items")
+    if isinstance(risks, list) and risks:
+        for i, r in enumerate(risks[:6], 1):
+            if not isinstance(r, dict):
+                continue
+            lv = str(r.get("risk_level") or "medium")
+            rn = str(r.get("risk_name") or "未命名风险")
+            imp = str(r.get("impact") or "").strip()
+            ua = str(r.get("user_action") or "").strip()
+            lines.append(f"风险{i}[{lv}] {rn}｜影响：{imp or '—'}｜建议：{ua or '—'}")
     return "\n".join(lines)

@@ -499,6 +499,31 @@ def _plugin_kpi(
         "nps_proxy": max(-1.0, min(1.0, float(state.sentiment))),
         "activation_avg": max(0.0, min(1.0, activation_avg)),
     }
+    # 将 KPI 映射到更直观的市场/财务 proxy（价格 / 销量 / 占有率 / 简单 ROI）
+    try:
+        # 价格 proxy：品牌/信任越高、问题越刚需，价格维持能力越强（0.6~1.4 区间）
+        base_price = 1.0
+        demand = max(0.0, min(1.0, scenario.problem_salience))
+        brand = max(0.0, min(1.0, trust))
+        price = base_price * (0.85 + 0.25 * brand + 0.15 * demand - 0.1 * float(state.rumor_level))
+        state.price_proxy = max(0.6, min(1.4, float(price)))
+        # 销量 proxy：转化 proxy 与激活度的函数（0~1）
+        volume = float(state.kpi_values["conversion_proxy"]) * 0.7 + activation_avg * 0.3
+        state.volume_proxy = max(0.0, min(1.0, volume))
+        # 市场占有率 proxy：留存与扩散感染比例共同决定（0~1）
+        share = float(state.kpi_values["retention_proxy"]) * 0.6 + float(state.diffusion_i) * 0.4
+        state.market_share_proxy = max(0.0, min(1.0, share))
+        # 简单 ROI proxy：用「价格×销量」对比当前运营成本 proxy
+        revenue_proxy = float(state.price_proxy or 0.0) * float(state.volume_proxy or 0.0)
+        cost_proxy = 0.25 + 0.5 * float(state.kpi_values.get("churn_stress_proxy", 0.0))
+        if cost_proxy <= 1e-6:
+            roi = 0.0
+        else:
+            roi = (revenue_proxy - cost_proxy) / cost_proxy
+        state.roi_proxy = float(max(-1.0, min(2.0, roi)))
+    except Exception:
+        # 若任何字段缺失，不影响原有 KPI 行为
+        pass
     if kpi_spec.hierarchy_enabled:
         tiers2: dict[str, dict[str, float]] = {"outcome": {}, "process": {}, "resource": {}}
         for kk, vv in state.kpi_values.items():

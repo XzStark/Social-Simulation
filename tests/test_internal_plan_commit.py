@@ -36,12 +36,16 @@ def test_apply_confirmed_sets_decision_layer_and_commitment() -> None:
             "professional_execution_plan": "x" * 100,
         },
         desk={"desk_verdict_cn": "可做", "estimated_timeline_desk_cn": "2 周首轮"},
+        decision_kind="business_deal",
     )
     assert st.decision_layer_active_summary
     assert len(st.internal_draft_commitments) == 1
     c0 = st.internal_draft_commitments[0]
     assert c0["due_tick"] == st.tick + 2
     assert float(st.cash_balance_million or 0) < cash_before
+    # decision_kind 被记录在决策层历史中，便于后续博弈与报告
+    kinds = {h.get("decision_kind") for h in st.decision_layer_history}
+    assert "business_deal" in kinds
 
 
 def test_fire_due_emits_once() -> None:

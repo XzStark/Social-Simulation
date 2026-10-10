@@ -75,6 +75,12 @@ def augment_decision_context(dctx: dict[str, Any], state: WorldState) -> None:
     dl = (state.decision_layer_active_summary or "").strip()
     if dl:
         dctx["decision_layer_directive"] = dl[:2500]
+    if state.decision_layer_history:
+        dctx["decision_layer_history_tail"] = list(state.decision_layer_history[-12:])
+    if state.key_actor_memory_rollups:
+        dctx["key_actor_memory_rollups"] = {
+            str(k): str(v)[:1200] for k, v in state.key_actor_memory_rollups.items() if str(v).strip()
+        }
     rga = state.regional_grounding_artifact
     if isinstance(rga, dict) and rga:
         dctx["regional_grounding"] = rga

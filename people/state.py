@@ -32,6 +32,13 @@ class WorldState(BaseModel):
     cash_balance_million: float | None = None
     fiscal_remaining_billion: float | None = None
     debt_balance_million: float | None = None
+    # 监管调查状态机：每项含 id/trigger_decision_id/status/severity/findings/next_deadline_tick 等
+    investigations: list[dict[str, Any]] = Field(default_factory=list)
+    # 市场/财务 proxy（产品/企业场景）：相对价格、销量、市场份额与简单 ROI 指标
+    price_proxy: float | None = None
+    volume_proxy: float | None = None
+    market_share_proxy: float | None = None
+    roi_proxy: float | None = None
     detail_events: list[dict[str, Any]] = Field(default_factory=list)
     horizon_forecast: dict[str, str | None] = Field(default_factory=dict)
     user_resolution_notes: list[str] = Field(default_factory=list)
@@ -46,6 +53,8 @@ class WorldState(BaseModel):
     company_memory_events: list[dict[str, Any]] = Field(default_factory=list)
     # 各关键智能体本人前几轮「公开陈述」摘录，避免下一轮 LLM 复述同一段话
     key_actor_recall: dict[str, list[str]] = Field(default_factory=dict)
+    # 智能体记忆压缩归档：当单个智能体 recall 接近上限时，将旧片段汇总到此
+    key_actor_memory_rollups: dict[str, str] = Field(default_factory=dict)
     # 指挥台确认后的「决策层」摘要，长期注入 decision_context，影响机关/公司内部推演口径
     decision_layer_active_summary: str = ""
     # 待确认桌面研判快照（与 pause 包 plan_evaluations 对齐）；确认或改评后清空/归档
@@ -64,11 +73,15 @@ class WorldState(BaseModel):
     kpi_by_tier: dict[str, dict[str, float]] = Field(default_factory=dict)
     # sir_per_cohort：各 cohort 的 S/I/R 份额（0~1，三者归一）
     diffusion_cohort_sir: dict[str, dict[str, float]] = Field(default_factory=dict)
+    # 分模态/分网络层的传播强度 proxy（online/media/offline/institution）
+    diffusion_layer_state: dict[str, float] = Field(default_factory=dict)
     resource_manpower: float | None = None
     resource_political_capital: float | None = None
     causal_rules_fired_tick: list[str] = Field(default_factory=list)
     # 本 tick 因果层（规则+边）动过的宏观指标名，供系统级因果审计（见 causal_audit）
     causal_metrics_this_tick: list[str] = Field(default_factory=list)
+    # 因果层动态可辨识性告警（v0）：每若干 tick 输出一次摘要，供前端/报告/审计使用
+    causal_identifiability: list[dict[str, Any]] = Field(default_factory=list)
     extension_trace: list[str] = Field(default_factory=list)
     behavior_micro_history: list[dict[str, Any]] = Field(default_factory=list)
     # 事件级溯源 v0：每层对宏观量的增量（见 people/attribution.py、系统说明 §16.4）
@@ -76,6 +89,14 @@ class WorldState(BaseModel):
     # 地区情境 grounding：模拟前多轮检索 trace + 注入 decision_context 的结构化摘要
     regional_grounding_trace: list[dict[str, Any]] = Field(default_factory=list)
     regional_grounding_artifact: dict[str, Any] = Field(default_factory=dict)
+    internal_issue_last_tick: int = 0
+    # 角色硬约束与漂移检测
+    role_guard_events: list[dict[str, Any]] = Field(default_factory=list)
+    role_drift_scores: dict[str, float] = Field(default_factory=dict)
+    # 沿时间线的不确定性（单次运行内的滚动方差 proxy）
+    timeline_uncertainty: list[dict[str, Any]] = Field(default_factory=list)
+    # 审计链（哈希链，检测篡改）
+    audit_chain: list[dict[str, Any]] = Field(default_factory=list)
 
     def snapshot_metrics(self) -> dict[str, float]:
         out = {
@@ -93,7 +114,17 @@ class WorldState(BaseModel):
             out["fiscal_remaining_billion"] = float(self.fiscal_remaining_billion)
         if self.debt_balance_million is not None:
             out["debt_balance_million"] = float(self.debt_balance_million)
+        if self.price_proxy is not None:
+            out["price_proxy"] = float(self.price_proxy)
+        if self.volume_proxy is not None:
+            out["volume_proxy"] = float(self.volume_proxy)
+        if self.market_share_proxy is not None:
+            out["market_share_proxy"] = float(self.market_share_proxy)
+        if self.roi_proxy is not None:
+            out["roi_proxy"] = float(self.roi_proxy)
         out["diffusion_i_share"] = float(self.diffusion_i)
+        for lk, lv in (self.diffusion_layer_state or {}).items():
+            out[f"diffusion_{lk}"] = float(lv)
         if self.resource_manpower is not None:
             out["resource_manpower"] = float(self.resource_manpower)
         if self.resource_political_capital is not None:
